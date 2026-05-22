@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Irlequip Workshop Scheduler</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;font-size:13px;color:#111;background:#F2F3F5;}
+input,select,textarea{font-family:'DM Sans',sans-serif;}
+input:focus,textarea:focus,select:focus{border-color:#C8102E!important;box-shadow:0 0 0 3px rgba(200,16,46,.1);outline:none;}
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:3px;}
+.jcard{background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:14px;cursor:pointer;transition:box-shadow .15s,border-color .15s,transform .1s;}
+.jcard:hover{border-color:#C8102E;box-shadow:0 4px 14px rgba(200,16,46,.12);transform:translateY(-1px);}
+.kpi{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:16px 18px;cursor:pointer;position:relative;overflow:hidden;transition:box-shadow .2s,border-color .2s;}
+.kpi:hover,.kpi.on{box-shadow:0 4px 16px rgba(0,0,0,.09);border-color:#C8102E;}
+.vtab{background:transparent;border:none;color:#6B7280;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:7px 14px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.vtab.on{background:#C8102E;color:#fff;}
+.mtab{background:transparent;border:none;border-bottom:2px solid transparent;color:#9CA3AF;font-size:13px;font-weight:700;padding:10px 18px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:color .15s,border-color .15s;}
+.mtab.on{border-bottom-color:#C8102E;color:#fff;}
+.mtab:hover:not(.on){color:#D1D5DB;}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const PROXY = "";
+const BOARD_ID = "qEvYkGds";
+const R="#C8102E",B="#111",W="#fff",LG="#F8F9FB",MG="#E5E7EB";
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+const STATUS_STYLES={
+  "scheduled":{label:"Scheduled",bg:"#EFF6FF",color:"#1D4ED8",border:"#BFDBFE",dot:"#3B82F6"},
+  "in progress":{label:"In Progress",bg:"#FFFBEB",color:"#B45309",border:"#FDE68A",dot:"#F59E0B"},
+  "completed":{label:"Completed",bg:"#F0FDF4",color:"#15803D",border:"#BBF7D0",dot:"#22C55E"},
+  "on hold":{label:"On Hold",bg:"#FEF2F2",color:"#B91C1C",border:"#FECACA",dot:"#EF4444"},
+};
+const PIE_C={"scheduled":"#3B82F6","in progress":"#F59E0B","completed":"#22C55E","on hold":"#EF4444","other":"#9CA3AF"};
+const PRIO={high:{label:"High",bg:"#FEF2F2",color:"#B91C1C",border:"#FECACA"},medium:{label:"Medium",bg:"#FFFBEB",color:"#92400E",border:"#FDE68A"},low:{label:"Low",bg:"#F9FAFB",color:"#374151",border:"#E5E7EB"}};
+
+const statusKey=n=>{if(!n)return"other";const l=n.toLowerCase().trim();for(const k of Object.keys(STATUS_STYLES))if(l.includes(k))return k;return"other";};
+const statusObj=k=>STATUS_STYLES[k]||{label:k||"Other",bg:"#F9FAFB",color:"#6B7280",border:"#E5E7EB",dot:"#9CA3AF"};
+const prioFromLabels=ls=>{if(!ls?.length)return"medium";const ns=ls.map(l=>(l.name||l.color||"").toLowerCase());if(ns.some(n=>n.includes("high")||n==="red"))return"high";if(ns.some(n=>n.includes("low")||n==="blue"))return"low";return"medium";};
+
+// API
+const tGet=async p=>{const r=await fetch(`/trello/${p}`);if(!r.ok)throw new Error(await r.text());return r.json();};
+const tPost=async(p,b)=>{const r=await fetch(`/trello/${p}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});if(!r.ok)throw new Error(await r.text());return r.json();};
+const tPut=async(p,b)=>{const r=await fetch(`/trello/${p}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});if(!r.ok)throw new Error(await r.text());return r.json();};
+
+const cardToJob=(card,lists)=>{
+  const list=lists.find(l=>l.id===card.idList);
+  const sk=statusKey(list?.name||"");
+  const due=card.due?card.due.split("T")[0]:null;
+  const techLabel=card.labels?.find(l=>l.name?.startsWith("Tech:"));
+  const tech=techLabel?techLabel.name.replace("Tech:","").trim():"";
+  const lines=(card.desc||"").split("\n");
+  const machine=lines.find(l=>/^Machine:/i.test(l))?.replace(/^Machine:\s*/i,"").trim()||"";
+  const brand=lines.find(l=>/^Brand:/i.test(l))?.replace(/^Brand:\s*/i,"").trim()||"";
+  const notes=lines.filter(l=>!/^(Machine|Brand):/i.test(l)).join("\n").trim();
+  return{id:card.id,jobNo:card.name.match(/^([A-Z]{2,}-\d+)/)?.[1]||"",title:card.name.replace(/^[A-Z]{2,}-\d+\s*/,"").trim()||card.name,machine,brand,notes,technician:tech,start:due||new Date().toISOString().split("T")[0],end:due||new Date().toISOString().split("T")[0],status:sk,listId:card.idList,listName:list?.name||"",priority:prioFromLabels(card.labels),labels:card.labels||[],parts:(card.checklists||[]).flatMap(cl=>cl.checkItems?.map(ci=>({id:ci.id,checklistId:cl.id,name:ci.name,checked:ci.state==="complete"}))||[]),trelloUrl:card.shortUrl};
+};
+
+// State
+let state={jobs:[],lists:[],loading:true,error:"",tab:"jobs",view:"board",filter:"all",syncing:false,lastSync:null,modal:null};
+const setState=patch=>{state={...state,...patch};render();};
+
+// Fetch
+async function loadBoard(quiet=false){
+  if(!quiet)setState({loading:true,error:""});else setState({syncing:true});
+  try{
+    const[lists,cards]=await Promise.all([tGet(`boards/${BOARD_ID}/lists?fields=id,name`),tGet(`boards/${BOARD_ID}/cards?checklists=all&fields=id,name,desc,idList,due,labels,shortUrl,closed&filter=open`)]);
+    setState({lists,jobs:cards.map(c=>cardToJob(c,lists)),loading:false,syncing:false,lastSync:new Date()});
+  }catch(e){setState({error:e.message,loading:false,syncing:false});}
+}
+
+// Render helpers
+const h=(tag,attrs={},children=[])=>{
+  const el=document.createElement(tag);
+  for(const[k,v]of Object.entries(attrs)){
+    if(k==="style"&&typeof v==="object")Object.assign(el.style,v);
+    else if(k.startsWith("on"))el.addEventListener(k.slice(2).toLowerCase(),v);
+    else el.setAttribute(k,v);
+  }
+  for(const c of(Array.isArray(children)?children:[children])){
+    if(c==null)continue;
+    el.appendChild(typeof c==="string"?document.createTextNode(c):c);
+  }
+  return el;
+};
+
+const badge=(text,bg,color,border)=>h("span",{style:{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10,border:`1px solid ${border}`,background:bg,color,display:"inline-flex",alignItems:"center",gap:4}},[text]);
+
+// Modal
+function renderModal(){
+  const{modal,lists}=state;
+  if(!modal)return null;
+  const isNew=!modal.id;
+  let form={...modal};
+  const overlay=h("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:50,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"24px 16px",overflowY:"auto"}});
+  overlay.addEventListener("click",e=>{if(e.target===overlay)setState({modal:null});});
+  const box=h("div",{style:{background:W,borderRadius:10,width:"100%",maxWidth:580,boxShadow:"0 24px 64px rgba(0,0,0,.35)"}});
+
+  const inp={width:"100%",padding:"8px 11px",background:LG,border:`1.5px solid ${MG}`,color:B,fontFamily:"'DM Sans',sans-serif",fontSize:13,borderRadius:6,boxSizing:"border-box"};
+  const field=(label,input)=>{const w=h("div",{},[h("label",{style:{display:"block",fontSize:11,fontWeight:600,color:"#6B7280",marginBottom:4}},[label]),input]);return w;};
+  const textInput=(key,val,placeholder="")=>{const el=h("input",{style:inp,value:val||"",placeholder});el.addEventListener("input",e=>{form[key]=e.target.value;});return el;};
+  const dateInput=(key,val)=>{const el=h("input",{style:inp,type:"date",value:val||""});el.addEventListener("input",e=>{form[key]=e.target.value;});return el;};
+
+  // Header
+  box.appendChild(h("div",{style:{background:B,borderRadius:"10px 10px 0 0",padding:"18px 22px",display:"flex",justifyContent:"space-between",alignItems:"center"}},[
+    h("div",{},[
+      h("div",{style:{fontSize:11,fontWeight:700,color:R,letterSpacing:"2px"}},[isNew?"NEW TRELLO CARD":"EDIT TRELLO CARD"]),
+      h("div",{style:{fontSize:16,fontWeight:800,color:W,marginTop:2}},[isNew?"New Work Order":form.title]),
+    ]),
+    h("button",{style:{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",color:W,width:32,height:32,borderRadius:6,fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"},onClick:()=>setState({modal:null})},["×"])
+  ]));
+
+  // Body
+  const body=h("div",{style:{padding:22,display:"grid",gap:16,maxHeight:"65vh",overflowY:"auto"}});
+  const g2=h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}});
+  const g3=h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}});
+
+  g2.appendChild(field("Job Number",textInput("jobNo",form.jobNo,"IRL-0001")));
+  g2.appendChild(field("Title",textInput("title",form.title,"e.g. Annual Inspection")));
+  body.appendChild(h("div",{},[h("div",{style:{fontSize:10,fontWeight:800,letterSpacing:".1em",textTransform:"uppercase",color:R,borderBottom:`2px solid ${R}20`,paddingBottom:5,marginBottom:10}},["Job Details"]),g2]));
+
+  const g2b=h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}});
+  g2b.appendChild(field("Machine Model",textInput("machine",form.machine)));
+  g2b.appendChild(field("Brand",textInput("brand",form.brand)));
+  body.appendChild(h("div",{},[h("div",{style:{fontSize:10,fontWeight:800,letterSpacing:".1em",textTransform:"uppercase",color:R,borderBottom:`2px solid ${R}20`,paddingBottom:5,marginBottom:10}},["Machine"]),g2b]));
+
+  const listSel=h("select",{style:inp});
+  lists.forEach(l=>{const o=h("option",{value:statusKey(l.name)},[l.name]);if(statusKey(l.name)===form.status)o.selected=true;listSel.appendChild(o);});
+  listSel.addEventListener("change",e=>{form.status=e.target.value;});
+  g3.appendChild(field("Trello List",listSel));
+  g3.appendChild(field("Start",dateInput("start",form.start)));
+  g3.appendChild(field("Due Date",dateInput("end",form.end)));
+  body.appendChild(h("div",{},[h("div",{style:{fontSize:10,fontWeight:800,letterSpacing:".1em",textTransform:"uppercase",color:R,borderBottom:`2px solid ${R}20`,paddingBottom:5,marginBottom:10}},["Scheduling"]),g3,h("div",{style:{marginTop:12}},[field("Technician",textInput("technician",form.technician))])]));
+
+  const ta=h("textarea",{style:{...inp,resize:"vertical"},rows:3,placeholder:"Fault description, safety notes…"});
+  ta.value=form.notes||"";ta.addEventListener("input",e=>{form.notes=e.target.value;});
+  body.appendChild(h("div",{},[h("div",{style:{fontSize:10,fontWeight:800,letterSpacing:".1em",textTransform:"uppercase",color:R,borderBottom:`2px solid ${R}20`,paddingBottom:5,marginBottom:10}},["Notes"]),ta]));
+
+  const errDiv=h("div",{style:{display:"none",background:"#FEF2F2",border:"1px solid #FECACA",color:"#B91C1C",padding:"10px 14px",borderRadius:6,fontSize:12}});
+  body.appendChild(errDiv);
+  box.appendChild(body);
+
+  // Footer
+  const saveBtn=h("button",{style:{background:R,color:W,border:"none",padding:"9px 22px",fontSize:13,fontWeight:800,cursor:"pointer",borderRadius:6,fontFamily:"'DM Sans',sans-serif"}},[isNew?"Create in Trello":"Save to Trello"]);
+  saveBtn.addEventListener("click",async()=>{
+    if(!form.title)return;
+    saveBtn.textContent="Saving…";saveBtn.disabled=true;
+    try{
+      const desc=`Machine: ${form.machine||""}\nBrand: ${form.brand||""}\n\n${form.notes||""}`.trim();
+      const targetList=lists.find(l=>statusKey(l.name)===form.status)||lists[0];
+      const cardName=`${form.jobNo?form.jobNo+" ":""}${form.title}`;
+      if(isNew){
+        const card=await tPost(`cards`,{idList:targetList.id,name:cardName,desc,due:form.end||null});
+        const newJob=cardToJob({...card,checklists:[]},lists);
+        setState({jobs:[...state.jobs,newJob],modal:null});
+      }else{
+        await tPut(`cards/${form.id}`,{name:cardName,desc,idList:targetList.id,due:form.end||null});
+        setState({jobs:state.jobs.map(j=>j.id===form.id?{...form,listId:targetList.id,listName:targetList.name}:j),modal:null});
+      }
+    }catch(e){errDiv.textContent="Error: "+e.message;errDiv.style.display="block";saveBtn.textContent=isNew?"Create in Trello":"Save to Trello";saveBtn.disabled=false;}
+  });
+
+  const footer=h("div",{style:{padding:"14px 22px",display:"flex",justifyContent:"space-between",gap:10,borderTop:`1px solid ${MG}`}});
+  if(!isNew){
+    const archBtn=h("button",{style:{background:W,border:"1.5px solid #FECACA",color:"#B91C1C",padding:"9px 16px",fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:6,fontFamily:"'DM Sans',sans-serif"}},["Archive"]);
+    archBtn.addEventListener("click",async()=>{
+      if(!confirm("Archive this card on Trello?"))return;
+      try{await tPut(`cards/${form.id}`,{closed:true});setState({jobs:state.jobs.filter(j=>j.id!==form.id),modal:null});}
+      catch(e){errDiv.textContent="Error: "+e.message;errDiv.style.display="block";}
+    });
+    footer.appendChild(archBtn);
+  }
+  footer.appendChild(h("div",{style:{display:"flex",gap:10,marginLeft:"auto"}},[
+    h("button",{style:{background:LG,border:`1.5px solid ${MG}`,color:"#6B7280",padding:"9px 16px",fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:6,fontFamily:"'DM Sans',sans-serif"},onClick:()=>setState({modal:null})},["Cancel"]),
+    saveBtn
+  ]));
+  box.appendChild(footer);
+  overlay.appendChild(box);
+  return overlay;
+}
+
+// Main render
+function render(){
+  const app=document.getElementById("app");
+  app.innerHTML="";
+  const{jobs,lists,loading,error,tab,view,filter,syncing,lastSync,modal}=state;
+
+  if(loading){
+    app.appendChild(h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",gap:16}},[
+      h("div",{style:{width:48,height:48,border:`4px solid ${MG}`,borderTopColor:R,borderRadius:"50%",animation:"spin .8s linear infinite"}}),
+      h("div",{style:{fontSize:14,color:"#9CA3AF",fontWeight:600}},["Loading Trello board…"]),
+    ]));
+    return;
+  }
+
+  if(error){
+    app.appendChild(h("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",gap:12,padding:24}},[
+      h("div",{style:{fontSize:32}},["⚠️"]),
+      h("div",{style:{fontSize:15,fontWeight:800}},["Could not load Trello board"]),
+      h("div",{style:{fontSize:12,color:"#6B7280",maxWidth:400,background:W,padding:16,borderRadius:8,border:`1px solid ${MG}`}},[error]),
+      h("button",{style:{background:R,color:W,border:"none",padding:"10px 24px",fontSize:13,fontWeight:700,borderRadius:6,cursor:"pointer"},onClick:()=>loadBoard()},["↻ Retry"]),
+    ]));
+    return;
+  }
+
+  const filtered=jobs.filter(j=>filter==="all"||j.status===filter);
+  const counts=Object.fromEntries([...Object.keys(STATUS_STYLES),"other"].map(s=>[s,jobs.filter(j=>j.status===s).length]));
+
+  // Header
+  const header=h("div",{style:{background:B,height:62,display:"flex",alignItems:"center",padding:"0 24px",gap:14,position:"sticky",top:0,zIndex:10,boxShadow:"0 2px 12px rgba(0,0,0,.3)"}});
+  header.appendChild(h("div",{style:{display:"flex",alignItems:"center",gap:10}},[
+    h("div",{style:{background:R,color:W,fontSize:11,fontWeight:900,padding:"6px 11px",letterSpacing:"2px",textTransform:"uppercase",clipPath:"polygon(0 0,100% 0,100% 68%,91% 100%,0 100%)"}},["Irlequip"]),
+    h("div",{},[
+      h("div",{style:{color:W,fontSize:15,fontWeight:800,letterSpacing:"-.3px",lineHeight:1}},["Workshop Scheduler"]),
+      h("div",{style:{color:"#9CA3AF",fontSize:10,fontWeight:500,marginTop:2,letterSpacing:".5px",textTransform:"uppercase"}},["Live · Trello Sync"]),
+    ]),
+  ]));
+  header.appendChild(h("div",{style:{width:1,height:28,background:"rgba(255,255,255,.12)"}}));
+  [["jobs","Work Orders"],["calendar","Calendar"],["techs","Technicians"]].forEach(([k,l])=>{
+    const btn=h("button",{class:`mtab${tab===k?" on":""}`,onClick:()=>setState({tab:k})},[l]);
+    header.appendChild(btn);
+  });
+  header.appendChild(h("div",{style:{display:"flex",alignItems:"center",gap:6,background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.12)",borderRadius:6,padding:"4px 10px"}},[
+    h("span",{style:{width:7,height:7,borderRadius:"50%",background:syncing?"#F59E0B":"#22C55E",boxShadow:`0 0 6px ${syncing?"#F59E0B":"#22C55E"}`}}),
+    h("span",{style:{fontSize:10,fontWeight:600,color:"#9CA3AF",letterSpacing:".05em"}},[syncing?"SYNCING…":"TRELLO LIVE"]),
+  ]));
+  if(lastSync)header.appendChild(h("span",{style:{fontSize:10,color:"#4B5563"}},["Synced "+lastSync.toLocaleTimeString()]));
+  header.appendChild(h("button",{style:{background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.15)",color:"#9CA3AF",padding:"6px 12px",fontSize:11,fontWeight:600,cursor:"pointer",borderRadius:5},onClick:()=>loadBoard(true)},["↻ Refresh"]));
+  header.appendChild(h("button",{style:{marginLeft:"auto",background:R,color:W,border:"none",padding:"9px 18px",fontSize:12,fontWeight:800,borderRadius:4,cursor:"pointer"},onClick:()=>setState({modal:{title:"",machine:"",brand:"",notes:"",technician:"",start:new Date().toISOString().split("T")[0],end:new Date().toISOString().split("T")[0],status:statusKey(lists[0]?.name||""),priority:"medium",parts:[]}})},[h("span",{},["+ New Card"])]));
+  app.appendChild(header);
+
+  // Content
+  const content=h("div",{style:{padding:"20px 24px",maxWidth:1500,margin:"0 auto"}});
+
+  // KPIs
+  const kpiRow=h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr auto",gap:12,marginBottom:18}});
+  Object.entries(STATUS_STYLES).forEach(([k,v])=>{
+    const kpi=h("div",{class:`kpi${filter===k?" on":""}`,onClick:()=>setState({filter:filter===k?"all":k})},[
+      h("div",{style:{position:"absolute",top:0,left:0,right:0,height:3,background:v.dot}}),
+      h("div",{style:{fontSize:36,fontWeight:900,color:B,lineHeight:1}},[(counts[k]||0).toString()]),
+      h("div",{style:{fontSize:10,fontWeight:600,letterSpacing:".07em",textTransform:"uppercase",color:"#6B7280",marginTop:4,display:"flex",alignItems:"center",gap:5}},[
+        h("span",{style:{width:7,height:7,borderRadius:"50%",background:v.dot}}),v.label
+      ]),
+    ]);
+    kpiRow.appendChild(kpi);
+  });
+  // Pie KPI
+  const pieKpi=h("div",{style:{background:W,border:`1px solid ${MG}`,borderRadius:10,padding:"14px 18px",minWidth:320}});
+  pieKpi.appendChild(h("div",{style:{fontSize:10,fontWeight:800,letterSpacing:".1em",textTransform:"uppercase",color:R,marginBottom:10,borderBottom:`2px solid ${R}20`,paddingBottom:5}},["Status Overview"]));
+  const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+  svg.setAttribute("width","160");svg.setAttribute("height","160");svg.style.overflow="visible";
+  const total=jobs.length;
+  if(total>0){
+    const cx=80,cy=80,r=60,inner=36;let angle=-Math.PI/2;
+    Object.entries(STATUS_STYLES).forEach(([k,v])=>{
+      const c=counts[k]||0;if(!c)return;
+      const sa=angle,ea=angle+(c/total)*2*Math.PI;angle=ea;
+      const c1=Math.cos(sa),s1=Math.sin(sa),c2=Math.cos(ea),s2=Math.sin(ea),lg=ea-sa>Math.PI?1:0;
+      let d;
+      if(ea-sa>=2*Math.PI-0.001)d=`M ${cx+r} ${cy} A ${r} ${r} 0 1 1 ${cx+r-0.001} ${cy} Z`;
+      else d=`M ${cx+c1*inner} ${cy+s1*inner} L ${cx+c1*r} ${cy+s1*r} A ${r} ${r} 0 ${lg} 1 ${cx+c2*r} ${cy+s2*r} L ${cx+c2*inner} ${cy+s2*inner} A ${inner} ${inner} 0 ${lg} 0 ${cx+c1*inner} ${cy+s1*inner} Z`;
+      const path=document.createElementNS("http://www.w3.org/2000/svg","path");
+      path.setAttribute("d",d);path.setAttribute("fill",PIE_C[k]);path.setAttribute("stroke",W);path.setAttribute("stroke-width","2");
+      svg.appendChild(path);
+    });
+    const t1=document.createElementNS("http://www.w3.org/2000/svg","text");t1.setAttribute("x",cx);t1.setAttribute("y",cy-5);t1.setAttribute("text-anchor","middle");t1.style.cssText=`font-size:20px;font-weight:800;fill:${B};font-family:'DM Sans',sans-serif;`;t1.textContent=total;
+    const t2=document.createElementNS("http://www.w3.org/2000/svg","text");t2.setAttribute("x",cx);t2.setAttribute("y",cy+12);t2.setAttribute("text-anchor","middle");t2.style.cssText=`font-size:9px;font-weight:600;fill:#9CA3AF;font-family:'DM Sans',sans-serif;`;t2.textContent="TOTAL";
+    svg.appendChild(t1);svg.appendChild(t2);
+  }
+  const pieWrap=h("div",{style:{display:"flex",alignItems:"center",gap:16}});
+  pieWrap.appendChild(svg);
+  const legend=h("div",{style:{display:"flex",flexDirection:"column",gap:6}});
+  Object.entries(STATUS_STYLES).forEach(([k,v])=>{
+    legend.appendChild(h("div",{style:{display:"flex",alignItems:"center",gap:8}},[
+      h("span",{style:{width:10,height:10,borderRadius:2,background:PIE_C[k]}}),
+      h("span",{style:{fontSize:12,color:"#374151",fontWeight:500,minWidth:80}},[v.label]),
+      h("span",{style:{fontSize:13,fontWeight:800,color:B}},[(counts[k]||0).toString()]),
+    ]));
+  });
+  pieWrap.appendChild(legend);
+  pieKpi.appendChild(pieWrap);
+  kpiRow.appendChild(pieKpi);
+  content.appendChild(kpiRow);
+
+  // Tabs
+  if(tab==="jobs"){
+    // Filter bar
+    const bar=h("div",{style:{display:"flex",gap:10,marginBottom:14,alignItems:"center",flexWrap:"wrap"}});
+    const sel=h("select",{style:{background:W,border:`1px solid ${MG}`,color:B,padding:"7px 12px",fontSize:12,outline:"none",borderRadius:6,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}});
+    h("option",{value:"all"},["All Lists"]);
+    const allOpt=document.createElement("option");allOpt.value="all";allOpt.textContent=`All Lists (${jobs.length})`;sel.appendChild(allOpt);
+    lists.forEach(l=>{const o=document.createElement("option");o.value=statusKey(l.name);o.textContent=`${l.name} (${jobs.filter(j=>j.listId===l.id).length})`;if(statusKey(l.name)===filter)o.selected=true;sel.appendChild(o);});
+    sel.addEventListener("change",e=>setState({filter:e.target.value}));
+    bar.appendChild(sel);
+    bar.appendChild(h("span",{style:{fontSize:11,fontWeight:600,color:"#9CA3AF",background:LG,border:`1px solid ${MG}`,padding:"5px 11px",borderRadius:20}},[`${filtered.length} card${filtered.length!==1?"s":""}`]));
+    const vtabs=h("div",{style:{marginLeft:"auto",display:"flex",background:W,border:`1px solid ${MG}`,borderRadius:6,overflow:"hidden"}});
+    ["board","list"].forEach(v2=>{const b=h("button",{class:`vtab${view===v2?" on":""}`,onClick:()=>setState({view:v2})},[v2.charAt(0).toUpperCase()+v2.slice(1)]);vtabs.appendChild(b);});
+    bar.appendChild(vtabs);
+    content.appendChild(bar);
+
+    if(view==="board"){
+      const boardWrap=h("div",{style:{display:"flex",flexDirection:"column",gap:20}});
+      const groups=lists.map(l=>({list:l,lj:filtered.filter(j=>j.listId===l.id)})).filter(g=>g.lj.length>0);
+      if(groups.length===0)boardWrap.appendChild(h("div",{style:{textAlign:"center",color:"#D1D5DB",padding:48,fontSize:13}},["No cards on this board"]));
+      groups.forEach(({list,lj})=>{
+        const sk=statusKey(list.name),s=statusObj(sk);
+        const section=h("div",{});
+        section.appendChild(h("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:10}},[
+          h("div",{style:{width:4,height:20,background:s.dot,borderRadius:2}}),
+          h("span",{style:{fontSize:13,fontWeight:800,color:B,textTransform:"uppercase",letterSpacing:"1px"}},[list.name]),
+          h("span",{style:{fontSize:11,fontWeight:600,color:"#9CA3AF",background:LG,border:`1px solid ${MG}`,padding:"2px 9px",borderRadius:20}},[lj.length.toString()]),
+        ]));
+        const grid=h("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:10}});
+        lj.forEach(job=>{
+          const js=statusObj(job.status),p=PRIO[job.priority]||PRIO.medium;
+          const card=h("div",{class:"jcard",style:{borderLeft:`3px solid ${js.dot}`},onClick:()=>setState({modal:{...job}})});
+          card.appendChild(h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}},[
+            h("div",{style:{flex:1,minWidth:0}},[
+              job.jobNo?h("div",{style:{fontSize:10,fontWeight:800,color:R,letterSpacing:"1.5px",marginBottom:2}},[job.jobNo]):h("span",{}),
+              h("div",{style:{fontSize:13,fontWeight:800,color:B,lineHeight:1.3}},[job.title]),
+              job.machine?h("div",{style:{fontSize:11,color:"#9CA3AF",marginTop:1}},[job.machine]):h("span",{}),
+            ]),
+            badge(p.label,p.bg,p.color,p.border),
+          ]));
+          card.appendChild(h("div",{style:{marginTop:8,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}},[
+            badge(js.label,js.bg,js.color,js.border),
+            job.technician?h("span",{style:{fontSize:11,color:"#9CA3AF"}},[job.technician]):h("span",{}),
+          ]));
+          if(job.parts?.length){
+            const done=job.parts.filter(p=>p.checked).length;
+            const pl=h("div",{style:{marginTop:10,paddingTop:10,borderTop:`1px solid ${MG}`}});
+            pl.appendChild(h("div",{style:{fontSize:10,fontWeight:700,color:"#6B7280",marginBottom:4}},[`CHECKLIST — ${done}/${job.parts.length}`]));
+            const bar2=h("div",{style:{height:4,background:MG,borderRadius:2,marginBottom:4}});
+            bar2.appendChild(h("div",{style:{height:4,width:`${job.parts.length?done/job.parts.length*100:0}%`,background:done===job.parts.length?"#22C55E":R,borderRadius:2}}));
+            pl.appendChild(bar2);
+            card.appendChild(pl);
+          }
+          card.appendChild(h("div",{style:{marginTop:10,paddingTop:8,borderTop:`1px solid ${LG}`,display:"flex",justifyContent:"space-between",alignItems:"center"}},[
+            h("span",{style:{fontSize:10,color:"#9CA3AF"}},[job.end||"No due date"]),
+            job.trelloUrl?h("a",{href:job.trelloUrl,target:"_blank",style:{fontSize:10,color:"#60A5FA",fontWeight:700,textDecoration:"none"},onClick:e=>e.stopPropagation()},["Trello ↗"]):h("span",{}),
+          ]));
+          grid.appendChild(card);
+        });
+        section.appendChild(grid);
+        boardWrap.appendChild(section);
+      });
+      content.appendChild(boardWrap);
+    } else {
+      const table=h("div",{style:{background:W,border:`1px solid ${MG}`,borderRadius:10,overflow:"hidden"}});
+      const thead=h("div",{style:{display:"grid",gridTemplateColumns:"2fr 1.5fr 1fr 1fr 1fr auto",background:LG,borderBottom:`2px solid ${MG}`,padding:"10px 14px",gap:8}});
+      ["Title","Machine","Technician","List","Due",""].forEach(t=>thead.appendChild(h("div",{style:{fontSize:10,fontWeight:700,color:"#9CA3AF",letterSpacing:".08em",textTransform:"uppercase"}},[t])));
+      table.appendChild(thead);
+      filtered.forEach(job=>{
+        const s=statusObj(job.status);
+        const row=h("div",{style:{display:"grid",gridTemplateColumns:"2fr 1.5fr 1fr 1fr 1fr auto",padding:"11px 14px",borderBottom:`1px solid ${LG}`,gap:8,alignItems:"center",cursor:"pointer"},onClick:()=>setState({modal:{...job}})});
+        row.appendChild(h("div",{},[h("div",{style:{fontSize:12,fontWeight:700,color:B}},[job.title]),job.jobNo?h("div",{style:{fontSize:10,fontWeight:800,color:R,letterSpacing:"1px"}},[job.jobNo]):h("span",{})]));
+        row.appendChild(h("div",{style:{fontSize:11,color:"#6B7280"}},[job.machine||"—"]));
+        row.appendChild(h("div",{style:{fontSize:12,color:"#6B7280"}},[job.technician||"—"]));
+        row.appendChild(badge(job.listName||s.label,s.bg,s.color,s.border));
+        row.appendChild(h("div",{style:{fontSize:11,color:"#9CA3AF"}},[job.end||"—"]));
+        const editBtn=h("button",{style:{background:W,border:`1px solid ${MG}`,color:"#6B7280",padding:"5px 12px",fontSize:11,fontWeight:600,cursor:"pointer",borderRadius:5},onClick:e=>{e.stopPropagation();setState({modal:{...job}});}},["Edit"]);
+        row.appendChild(editBtn);
+        table.appendChild(row);
+      });
+      content.appendChild(table);
+    }
+  }
+
+  if(tab==="calendar"){
+    // Simple calendar
+    const now=new Date();
+    const calState=window._calState||{y:now.getFullYear(),m:now.getMonth(),sel:null};
+    window._calState=calState;
+    const calWrap=h("div",{style:{display:"flex",gap:16,alignItems:"flex-start"}});
+    const cal=h("div",{style:{flex:1,background:W,border:`1px solid ${MG}`,borderRadius:10,overflow:"hidden",minWidth:0}});
+    const calHeader=h("div",{style:{background:B,padding:"14px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}});
+    calHeader.appendChild(h("button",{style:{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",color:W,width:30,height:30,borderRadius:6,cursor:"pointer",fontSize:16},onClick:()=>{window._calState={...calState,m:calState.m===0?11:calState.m-1,y:calState.m===0?calState.y-1:calState.y};render();}},["‹"]));
+    calHeader.appendChild(h("div",{style:{color:W,fontWeight:800,fontSize:16}},[`${MONTHS[calState.m]} ${calState.y}`]));
+    calHeader.appendChild(h("button",{style:{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",color:W,width:30,height:30,borderRadius:6,cursor:"pointer",fontSize:16},onClick:()=>{window._calState={...calState,m:calState.m===11?0:calState.m+1,y:calState.m===11?calState.y+1:calState.y};render();}},["›"]));
+    cal.appendChild(calHeader);
+    const dayHeaders=h("div",{style:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",background:LG,borderBottom:`1px solid ${MG}`}});
+    DAYS.forEach(d=>dayHeaders.appendChild(h("div",{style:{padding:"8px 4px",textAlign:"center",fontSize:10,fontWeight:800,color:"#9CA3AF",letterSpacing:".08em"}},[d])));
+    cal.appendChild(dayHeaders);
+    const grid2=h("div",{style:{display:"grid",gridTemplateColumns:"repeat(7,1fr)"}});
+    const firstDay=new Date(calState.y,calState.m,1).getDay();
+    const dim=new Date(calState.y,calState.m+1,0).getDate();
+    const pad=n=>String(n).padStart(2,"0");
+    const ds=d=>`${calState.y}-${pad(calState.m+1)}-${pad(d)}`;
+    for(let i=0;i<firstDay;i++)grid2.appendChild(h("div",{style:{minHeight:72,background:LG,borderRight:`1px solid ${LG}`,borderBottom:`1px solid ${LG}`}}));
+    for(let d=1;d<=dim;d++){
+      const dstr=ds(d);
+      const dj=jobs.filter(j=>j.start<=dstr&&j.end>=dstr);
+      const isTod=now.getFullYear()===calState.y&&now.getMonth()===calState.m&&now.getDate()===d;
+      const isSel=calState.sel===d;
+      const cell=h("div",{style:{minHeight:72,borderRight:`1px solid ${LG}`,borderBottom:`1px solid ${LG}`,padding:4,cursor:"pointer",background:isSel?"#FFF0F2":W},onClick:()=>{window._calState={...calState,sel:isSel?null:d};render();}});
+      cell.appendChild(h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:2}},[
+        h("span",{style:{fontSize:12,fontWeight:isTod?900:600,color:isTod?W:isSel?R:B,background:isTod?R:"transparent",borderRadius:"50%",width:22,height:22,display:"flex",alignItems:"center",justifyContent:"center"}},[d.toString()]),
+        dj.length?h("span",{style:{fontSize:9,fontWeight:800,color:R,background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,padding:"1px 5px"}},[dj.length.toString()]):h("span",{}),
+      ]));
+      dj.slice(0,2).forEach(j=>{const s=statusObj(j.status);const tag=h("div",{style:{fontSize:9,fontWeight:700,padding:"2px 4px",borderRadius:3,background:s.bg,color:s.color,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",marginBottom:1,cursor:"pointer"},onClick:e=>{e.stopPropagation();setState({modal:{...j}});}},[j.title]);cell.appendChild(tag);});
+      if(dj.length>2)cell.appendChild(h("div",{style:{fontSize:9,color:"#9CA3AF",paddingLeft:2}},["+"+(dj.length-2)]));
+      grid2.appendChild(cell);
+    }
+    cal.appendChild(grid2);
+    calWrap.appendChild(cal);
+    // Side panel
+    const panel=h("div",{style:{width:240,flexShrink:0,background:W,border:`1px solid ${MG}`,borderRadius:10,overflow:"hidden"}});
+    const selJobs=calState.sel?jobs.filter(j=>{const s=ds(calState.sel);return j.start<=s&&j.end>=s;}):[];
+    panel.appendChild(h("div",{style:{background:B,padding:"12px 16px"}},[
+      h("div",{style:{color:W,fontWeight:800,fontSize:13}},[calState.sel?`${MONTHS[calState.m]} ${calState.sel}`:"Select a Day"]),
+      h("div",{style:{color:"#9CA3AF",fontSize:10,marginTop:2}},[calState.sel?`${selJobs.length} job${selJobs.length!==1?"s":""}`:"Click a date"]),
+    ]));
+    const panelBody=h("div",{style:{padding:10,display:"flex",flexDirection:"column",gap:8,maxHeight:480,overflowY:"auto"}});
+    if(!calState.sel)panelBody.appendChild(h("div",{style:{textAlign:"center",color:"#D1D5DB",padding:24,fontSize:12}},["📅 Click any date"]));
+    else if(!selJobs.length)panelBody.appendChild(h("div",{style:{textAlign:"center",color:"#D1D5DB",padding:24,fontSize:12}},["No jobs this day"]));
+    selJobs.forEach(j=>{
+      const s=statusObj(j.status);
+      const card=h("div",{style:{background:LG,border:`1px solid ${MG}`,borderLeft:`3px solid ${s.dot}`,borderRadius:6,padding:"8px 10px",cursor:"pointer"},onClick:()=>setState({modal:{...j}})});
+      card.appendChild(h("div",{style:{fontSize:12,fontWeight:700,color:B}},[j.title]));
+      card.appendChild(h("div",{style:{fontSize:10,color:"#9CA3AF"}},[j.machine||""]));
+      panelBody.appendChild(card);
+    });
+    panel.appendChild(panelBody);
+    calWrap.appendChild(panel);
+    content.appendChild(calWrap);
+  }
+
+  if(tab==="techs"){
+    const techs=[...new Set(jobs.map(j=>j.technician||"Unassigned"))].sort();
+    const grid3=h("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14}});
+    techs.forEach(tech=>{
+      const tj=jobs.filter(j=>(j.technician||"Unassigned")===tech);
+      const active=tj.filter(j=>j.status==="in progress").length;
+      const card=h("div",{style:{background:W,border:`1px solid ${MG}`,borderRadius:10,overflow:"hidden"}});
+      card.appendChild(h("div",{style:{background:B,padding:"12px 16px",display:"flex",alignItems:"center",gap:10}},[
+        h("div",{style:{width:36,height:36,borderRadius:"50%",background:R,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:W,fontSize:14,flexShrink:0}},[tech.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()]),
+        h("div",{},[
+          h("div",{style:{color:W,fontWeight:800,fontSize:13}},[tech]),
+          h("div",{style:{color:"#9CA3AF",fontSize:10}},[`${tj.length} job${tj.length!==1?"s":""} · ${active} active`]),
+        ]),
+      ]));
+      const body2=h("div",{style:{padding:10,display:"flex",flexDirection:"column",gap:8}});
+      tj.forEach(j=>{
+        const s=statusObj(j.status);
+        const jcard=h("div",{style:{background:LG,border:`1px solid ${MG}`,borderLeft:`3px solid ${s.dot}`,borderRadius:6,padding:"8px 10px",cursor:"pointer"},onClick:()=>setState({modal:{...j}})});
+        jcard.appendChild(h("div",{style:{fontSize:12,fontWeight:700,color:B}},[j.title]));
+        jcard.appendChild(h("div",{style:{fontSize:10,color:"#9CA3AF",marginTop:1}},[j.machine||""]));
+        body2.appendChild(jcard);
+      });
+      card.appendChild(body2);
+      grid3.appendChild(card);
+    });
+    content.appendChild(grid3);
+  }
+
+  app.appendChild(content);
+
+  // Modal
+  const modalEl=renderModal();
+  if(modalEl)app.appendChild(modalEl);
+}
+
+// Init
+loadBoard();
+setInterval(()=>loadBoard(true),90000);
+</script>
+</body>
+</html>
