@@ -115,10 +115,9 @@
   .tech-marker{cursor:pointer;}
   .tech-marker circle.avatar-bg{fill:var(--red);stroke:var(--white);stroke-width:1.4;}
   .tech-marker text.avatar-initial{fill:var(--white);font-size:6.5px;font-weight:700;text-anchor:middle;}
-  .tech-marker.status-Travelling circle.avatar-bg{fill:var(--warn);}
+  .tech-marker.status-Scheduled circle.avatar-bg{fill:#4a6fa5;}
   .tech-marker.status-Waiting-on-parts circle.avatar-bg{fill:#7a5cc4;}
   .tech-marker.status-Completed circle.avatar-bg{fill:var(--ok);}
-  .tech-marker.status-Off circle.avatar-bg{fill:var(--grey-500);}
   .tech-list{list-style:none;margin:0;padding:0;}
   .tech-row{
     display:flex;
@@ -140,10 +139,9 @@
     font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;
     background:#f3c6cd;color:var(--red);white-space:nowrap;
   }
-  .status-pill.status-Travelling{background:#fbe3c6;color:var(--warn);}
+  .status-pill.status-Scheduled{background:#dbe6f3;color:#2c4770;}
   .status-pill.status-Waiting-on-parts{background:#e6ddf7;color:#5c3fa3;}
   .status-pill.status-Completed{background:#d4f0de;color:var(--ok);}
-  .status-pill.status-Off{background:var(--grey-100);color:var(--grey-700);}
   .tech-meta{font-size:12.5px;color:var(--grey-500);margin-top:2px;}
   .tech-name{font-weight:600;font-size:14.5px;}
   .table-view table{width:100%;border-collapse:collapse;font-size:13.5px;}
@@ -234,13 +232,7 @@
     </div>
     <div class="field">
       <label>Status</label>
-      <select id="f-status">
-        <option>On site</option>
-        <option>Travelling</option>
-        <option>Waiting on parts</option>
-        <option>Completed</option>
-        <option>Off</option>
-      </select>
+      <select id="f-status"></select>
     </div>
     <div class="field">
       <label>Customer</label>
@@ -307,6 +299,7 @@ const COUNTIES = [
 ];
 
 let technicians = [];
+let statuses = []; // [{id, name}] — loaded from /api/config, in board list order
 let editingId = null;
 let currentView = 'map';
 
@@ -452,4 +445,163 @@ function formatTime(iso){
   const diffMin = Math.round((Date.now() - d.getTime()) / 60000);
   if (diffMin < 1) return 'just now';
   if (diffMin < 60) return `${diffMin}m ago`;
-  const diffH =
+  const diffH = Math.round(diffMin/60);
+  if (diffH < 24) return `${diffH}h ago`;
+  return d.toLocaleDateString('en-IE', { day:'2-digit', month:'short' });
+}
+
+function renderAll(){
+  renderMarkers();
+  renderList();
+  renderTable();
+}
+
+async function loadTechnicians(silent){
+  if (!silent) $('#status-line').textContent = 'Loading…';
+  try {
+    const r = await fetch('/api/technicians');
+    if (!r.ok) throw new Error(await r.text());
+    technicians = await r.json();
+    renderAll();
+    $('#status-line').textContent = 'Updated ' + new Date().toLocaleTimeString('en-IE',{hour:'2-digit',minute:'2-digit'});
+  } catch (err) {
+    console.error(err);
+    $('#status-line').textContent = 'Could not reach Trello — check server setup';
+  }
+}
+
+function populateCountySelect(){
+  const sel = $('#f-county');
+  sel.innerHTML = '<option value="">— Select county —</option>' +
+    COUNTIES.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+}
+
+async function loadConfig(){
+  try {
+    const r = await fetch('/api/config');
+    if (!r.ok) throw new Error(await r.text());
+    const data = await r.json();
+    statuses = data.statuses || [];
+    $('#f-status').innerHTML = statuses.map(s => `<option>${escapeHtml(s.name)}</option>`).join('');
+  } catch (err) {
+    console.error('Could not load statuses from board', err);
+  }
+}
+
+function defaultStatus(){
+  return statuses[0]?.name || '';
+}
+
+function openAddModalForCounty(countyName){
+  editingId = null;
+  $('#modal-title').textContent = 'Add technician';
+  $('#modal-subtitle').textContent = "Log where they are and what they're on.";
+  $('#f-name').value = '';
+  $('#f-county').value = countyName || '';
+  $('#f-status').value = defaultStatus();
+  $('#f-customer').value = '';
+  $('#f-machine').value = '';
+  $('#f-problem').value = '';
+  $('#modal-updated').textContent = '';
+  $('#archive-btn').hidden = true;
+  $('#trello-link').hidden = true;
+  $('#modal-backdrop').hidden = false;
+  $('#f-name').focus();
+}
+
+function openEditModal(t){
+  editingId = t.id;
+  $('#modal-title').textContent = t.name;
+  $('#modal-subtitle').textContent = 'Update their status and job details.';
+  $('#f-name').value = t.name;
+  $('#f-county').value = t.county || '';
+  $('#f-status').value = t.status || defaultStatus();
+  $('#f-customer').value = t.customer || '';
+  $('#f-machine').value = t.machine || '';
+  $('#f-problem').value = t.problem || '';
+  $('#modal-updated').textContent = t.updated ? 'Last updated ' + formatTime(t.updated) : '';
+  $('#archive-btn').hidden = false;
+  if (t.trelloUrl) {
+    $('#trello-link').hidden = false;
+    $('#trello-link').href = t.trelloUrl;
+  } else {
+    $('#trello-link').hidden = true;
+  }
+  $('#modal-backdrop').hidden = false;
+}
+
+function closeModal(){
+  $('#modal-backdrop').hidden = true;
+}
+
+async function saveTechnician(){
+  const name = $('#f-name').value.trim();
+  if (!name) { $('#f-name').focus(); return; }
+
+  const payload = {
+    name,
+    county: $('#f-county').value,
+    status: $('#f-status').value,
+    customer: $('#f-customer').value.trim(),
+    machine: $('#f-machine').value.trim(),
+    problem: $('#f-problem').value.trim(),
+  };
+
+  $('#save-btn').disabled = true;
+  try {
+    const url = editingId ? `/api/technicians/${editingId}` : '/api/technicians';
+    const method = editingId ? 'PUT' : 'POST';
+    const r = await fetch(url, {
+      method,
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    closeModal();
+    await loadTechnicians(true);
+  } catch (err) {
+    alert('Could not save — ' + err.message);
+  } finally {
+    $('#save-btn').disabled = false;
+  }
+}
+
+async function archiveTechnician(){
+  if (!editingId) return;
+  if (!confirm('Remove this technician from the tracker? (The Trello card is archived, not deleted, so history is kept.)')) return;
+  try {
+    const r = await fetch(`/api/technicians/${editingId}`, { method:'DELETE' });
+    if (!r.ok) throw new Error(await r.text());
+    closeModal();
+    await loadTechnicians(true);
+  } catch (err) {
+    alert('Could not remove — ' + err.message);
+  }
+}
+
+function setView(view){
+  currentView = view;
+  $('#tab-map').classList.toggle('active', view==='map');
+  $('#tab-list').classList.toggle('active', view==='list');
+  $('#map-view').hidden = view !== 'map';
+  $('#list-view').hidden = view !== 'list';
+}
+
+// wire up
+$('#tab-map').addEventListener('click', () => setView('map'));
+$('#tab-list').addEventListener('click', () => setView('list'));
+$('#add-btn').addEventListener('click', () => openAddModalForCounty(''));
+$('#refresh-btn').addEventListener('click', () => loadTechnicians());
+$('#cancel-btn').addEventListener('click', closeModal);
+$('#save-btn').addEventListener('click', saveTechnician);
+$('#archive-btn').addEventListener('click', archiveTechnician);
+$('#modal-backdrop').addEventListener('click', (e) => { if (e.target.id === 'modal-backdrop') closeModal(); });
+
+populateCountySelect();
+buildMap();
+loadConfig().then(() => loadTechnicians());
+setInterval(() => loadTechnicians(true), 30000);
+</script>
+
+</body>
+</html>
