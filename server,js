@@ -1,36 +1,165 @@
-import express from "express";
-import cors from "cors";
-import { readFileSync } from "fs";
+require('dotenv').config();
+const express = require('express');
+const path = require('path');
 
 const app = express();
-app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
-const API_KEY = "d14ca594a23f93e4d620e60eaeeceaca";
-const TOKEN = "ATTA276c5a6a510c336a1d907be9787e9eb88b17e60f8b43cd65d2b2040399c80bcb8B7D103B";
-const BASE = "https://api.trello.com/1";
+const {
+  TRELLO_KEY,
+  TRELLO_TOKEN,
+  TRELLO_BOARD_ID,
+  TRELLO_LIST_ID,
+  PORT = 3000,
+} = process.env;
 
-// Serve the dashboard HTML
-app.get("/", (req, res) => {
-  res.sendFile("index.html", { root: "." });
-});
+if (!TRELLO_KEY || !TRELLO_TOKEN || !TRELLO_LIST_ID) {
+  console.warn(
+    '[warning] TRELLO_KEY / TRELLO_TOKEN / TRELLO_LIST_ID are not fully set. ' +
+      'Set them as environment variables before deploying — see README.md.'
+  );
+}
 
-// Proxy all Trello API calls
-app.all("/trello/*", async (req, res) => {
-  const path = req.params[0];
-  const query = new URLSearchParams(req.query).toString();
-  const url = `${BASE}/${path}?key=${API_KEY}&token=${TOKEN}${query ? "&" + query : ""}`;
+const TRELLO_BASE = 'https://api.trello.com/1';
+
+function trelloAuth(extra = {}) {
+  return new URLSearchParams({
+    key: TRELLO_KEY || '',
+    token: TRELLO_TOKEN || '',
+    ...extra,
+  });
+}
+
+// Structured fields are stored line-by-line in the Trello card description,
+// the same pattern used in the main workshop dashboard (irlequip-dashboard-2).
+const FIELD_ORDER = ['County', 'Customer', 'Machine', 'Problem', 'Status', 'Updated'];
+
+function parseDescription(desc = '') {
+  const fields = { County: '', Customer: '', Machine: '', Problem: '', Status: 'On site', Updated: '' };
+  desc.split('\n').forEach((line) => {
+    const match = line.match(/^([A-Za-z]+):\s*(.*)$/);
+    if (match && FIELD_ORDER.includes(match[1])) {
+      fields[match[1]] = match[2].trim();
+    }
+  });
+  return fields;
+}
+
+function buildDescription(fields) {
+  return FIELD_ORDER.map((key) => `${key}: ${fields[key] ?? ''}`).join('\n');
+}
+
+function cardToTechnician(card) {
+  const fields = parseDescription(card.desc);
+  return {
+    id: card.id,
+    name: card.name,
+    county: fields.County,
+    customer: fields.Customer,
+    machine: fields.Machine,
+    problem: fields.Problem,
+    status: fields.Status || 'On site',
+    updated: fields.Updated,
+    trelloUrl: card.shortUrl,
+  };
+}
+
+// --- API routes -------------------------------------------------------
+
+app.get('/api/technicians', async (req, res) => {
   try {
-    const response = await fetch(url, {
-      method: req.method,
-      headers: { "Content-Type": "application/json" },
-      body: ["POST", "PUT"].includes(req.method) ? JSON.stringify(req.body) : undefined,
-    });
-    const data = await response.json();
-    res.status(response.status).json(data);
+    const url = `${TRELLO_BASE}/lists/${TRELLO_LIST_ID}/cards?${trelloAuth({
+      fields: 'name,desc,shortUrl,dateLastActivity',
+    })}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`Trello API error ${r.status}: ${await r.text()}`);
+    const cards = await r.json();
+    res.json(cards.map(cardToTechnician));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Failed to load technicians from Trello', detail: String(err) });
   }
 });
 
-app.listen(process.env.PORT || 3000, () => console.log("Irlequip Dashboard running ✅"));
+app.post('/api/technicians', async (req, res) => {
+  try {
+    const { name, county, customer, machine, problem, status } = req.body;
+    if (!name) return res.status(400).json({ error: 'name is required' });
+
+    const fields = {
+      County: county || '',
+      Customer: customer || '',
+      Machine: machine || '',
+      Problem: problem || '',
+      Status: status || 'On site',
+      Updated: new Date().toISOString(),
+    };
+
+    const url = `${TRELLO_BASE}/cards?${trelloAuth({
+      idList: TRELLO_LIST_ID,
+      name,
+      desc: buildDescription(fields),
+    })}`;
+    const r = await fetch(url, { method: 'POST' });
+    if (!r.ok) throw new Error(`Trello API error ${r.status}: ${await r.text()}`);
+    const card = await r.json();
+    res.json(cardToTechnician(card));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to create technician card', detail: String(err) });
+  }
+});
+
+app.put('/api/technicians/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, county, customer, machine, problem, status } = req.body;
+
+    const fields = {
+      County: county || '',
+      Customer: customer || '',
+      Machine: machine || '',
+      Problem: problem || '',
+      Status: status || 'On site',
+      Updated: new Date().toISOString(),
+    };
+
+    const params = trelloAuth({ desc: buildDescription(fields) });
+    if (name) params.set('name', name);
+
+    const url = `${TRELLO_BASE}/cards/${id}?${params}`;
+    const r = await fetch(url, { method: 'PUT' });
+    if (!r.ok) throw new Error(`Trello API error ${r.status}: ${await r.text()}`);
+    const card = await r.json();
+    res.json(cardToTechnician(card));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update technician card', detail: String(err) });
+  }
+});
+
+app.delete('/api/technicians/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Archive rather than permanently delete, so history is kept on Trello.
+    const url = `${TRELLO_BASE}/cards/${id}?${trelloAuth({ closed: 'true' })}`;
+    const r = await fetch(url, { method: 'PUT' });
+    if (!r.ok) throw new Error(`Trello API error ${r.status}: ${await r.text()}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to archive technician card', detail: String(err) });
+  }
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    ok: true,
+    configured: Boolean(TRELLO_KEY && TRELLO_TOKEN && TRELLO_LIST_ID),
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(`Road Tech Tracker running on port ${PORT}`);
+});
