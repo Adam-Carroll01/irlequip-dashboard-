@@ -36,10 +36,10 @@
     --status-critical-tint:#f8e4e4;
 
     /* Province categorical colors (map) */
-    --prov-leinster:#2a78d6;      --prov-leinster-fill:#d0e1f6;
-    --prov-munster:#1baf7a;       --prov-munster-fill:#cdede2;
-    --prov-connacht:#eb6834;      --prov-connacht-fill:#fbded2;
-    --prov-ulster:#8f7c68;        --prov-ulster-fill:#e0dad5;
+    --prov-leinster:#2a78d6;      --prov-leinster-fill:#6ea3e3;
+    --prov-munster:#1baf7a;       --prov-munster-fill:#64c9a5;
+    --prov-connacht:#eb6834;      --prov-connacht-fill:#f19875;
+    --prov-ulster:#8f7c68;        --prov-ulster-fill:#b3a698;
 
     /* Default (unassigned) technician-status color, before JS assigns one */
     --tech-status-color:#6b7075;
@@ -73,10 +73,10 @@
       --status-warning-tint:#5a461d;
       --status-critical-tint:#522527;
 
-      --prov-leinster:#3987e5;  --prov-leinster-fill:#2a5282;
-      --prov-munster:#199e70;   --prov-munster-fill:#1a5d47;
-      --prov-connacht:#d95926;  --prov-connacht-fill:#7a3a22;
-      --prov-ulster:#a0907f;    --prov-ulster-fill:#61564a;
+      --prov-leinster:#3987e5;  --prov-leinster-fill:#3372bd;
+      --prov-munster:#199e70;   --prov-munster-fill:#1a8460;
+      --prov-connacht:#d95926;  --prov-connacht-fill:#b34d24;
+      --prov-ulster:#a0907f;    --prov-ulster-fill:#86796c;
 
       --tech-status-color:#9a9fa5;
       --tech-status-tint:#2c2c2e;
@@ -108,10 +108,10 @@
     --status-warning-tint:#5a461d;
     --status-critical-tint:#522527;
 
-    --prov-leinster:#3987e5;  --prov-leinster-fill:#2a5282;
-    --prov-munster:#199e70;   --prov-munster-fill:#1a5d47;
-    --prov-connacht:#d95926;  --prov-connacht-fill:#7a3a22;
-    --prov-ulster:#a0907f;    --prov-ulster-fill:#61564a;
+    --prov-leinster:#3987e5;  --prov-leinster-fill:#3372bd;
+    --prov-munster:#199e70;   --prov-munster-fill:#1a8460;
+    --prov-connacht:#d95926;  --prov-connacht-fill:#b34d24;
+    --prov-ulster:#a0907f;    --prov-ulster-fill:#86796c;
 
     --tech-status-color:#9a9fa5;
     --tech-status-tint:#2c2c2e;
@@ -185,7 +185,7 @@
   .icon-btn:focus-visible{outline:2px solid var(--white);outline-offset:2px;}
   .icon-btn svg{width:17px;height:17px;}
   main{
-    max-width:1200px;
+    max-width:1360px;
     margin:0 auto;
     padding:20px 24px 60px;
   }
@@ -213,7 +213,7 @@
   #map-view{display:flex;flex-direction:column;gap:20px;}
   .layout{
     display:grid;
-    grid-template-columns:minmax(280px, 460px) 1fr;
+    grid-template-columns:minmax(0, 1fr) minmax(280px, 380px);
     gap:20px;
     align-items:start;
   }
