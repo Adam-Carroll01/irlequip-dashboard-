@@ -52,10 +52,10 @@ async function getLists() {
 
 // Remaining structured fields are stored line-by-line in the Trello card
 // description (Status is no longer one of these — it's derived from idList).
-const FIELD_ORDER = ['County', 'Customer', 'Machine', 'Problem', 'Updated'];
+const FIELD_ORDER = ['County', 'Customer', 'Machine', 'Problem', 'Date', 'Updated'];
 
 function parseDescription(desc = '') {
-  const fields = { County: '', Customer: '', Machine: '', Problem: '', Updated: '' };
+  const fields = { County: '', Customer: '', Machine: '', Problem: '', Date: '', Updated: '' };
   desc.split('\n').forEach((line) => {
     const match = line.match(/^([A-Za-z]+):\s*(.*)$/);
     if (match && FIELD_ORDER.includes(match[1])) {
@@ -79,6 +79,7 @@ function cardToTechnician(card, listsById) {
     machine: fields.Machine,
     problem: fields.Problem,
     status: listsById.get(card.idList)?.name || 'Unknown',
+    date: fields.Date,
     updated: fields.Updated,
     trelloUrl: card.shortUrl,
   };
@@ -118,7 +119,7 @@ app.get('/api/technicians', async (req, res) => {
 
 app.post('/api/technicians', async (req, res) => {
   try {
-    const { name, county, customer, machine, problem, status } = req.body;
+    const { name, county, customer, machine, problem, status, date } = req.body;
     if (!name) return res.status(400).json({ error: 'name is required' });
 
     const lists = await getLists();
@@ -131,6 +132,7 @@ app.post('/api/technicians', async (req, res) => {
       Customer: customer || '',
       Machine: machine || '',
       Problem: problem || '',
+      Date: date || '',
       Updated: new Date().toISOString(),
     };
 
@@ -152,7 +154,7 @@ app.post('/api/technicians', async (req, res) => {
 app.put('/api/technicians/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, county, customer, machine, problem, status } = req.body;
+    const { name, county, customer, machine, problem, status, date } = req.body;
 
     const lists = await getLists();
     const listsById = new Map(lists.map((l) => [l.id, l]));
@@ -162,6 +164,7 @@ app.put('/api/technicians/:id', async (req, res) => {
       Customer: customer || '',
       Machine: machine || '',
       Problem: problem || '',
+      Date: date || '',
       Updated: new Date().toISOString(),
     };
 
