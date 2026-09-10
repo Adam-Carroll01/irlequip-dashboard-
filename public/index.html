@@ -9,27 +9,132 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
+    color-scheme: light;
     --red:#C8102E;
+    --red-ink:#a10d25;
     --black:#111111;
     --white:#ffffff;
-    --grey-50:#f7f7f8;
-    --grey-100:#eceef0;
-    --grey-300:#cdd2d8;
-    --grey-500:#8a929b;
-    --grey-700:#4a4f55;
-    --ok:#1f9d55;
-    --warn:#e07b0f;
-    --shadow: 0 2px 10px rgba(17,17,17,0.08);
+
+    /* Surfaces & ink (light) */
+    --page-bg:#f7f7f6;
+    --surface:#ffffff;
+    --header-bg:#111111;
+    --ink-primary:#111111;
+    --ink-secondary:#4a4f55;
+    --ink-muted:#8a929b;
+    --border:#eceef0;
+    --border-strong:#cdd2d8;
+    --shadow-1: 0 1px 2px rgba(17,17,17,.05), 0 1px 3px rgba(17,17,17,.07);
+    --shadow-2: 0 8px 24px rgba(17,17,17,.12);
+
+    /* Status palette (fixed meaning: good / warning / critical) */
+    --status-good:#0ca30c;
+    --status-good-tint:#ddf2dd;
+    --status-warning:#fab219;
+    --status-warning-tint:#fef4df;
+    --status-critical:#d03b3b;
+    --status-critical-tint:#f8e4e4;
+
+    /* Province categorical colors (map) */
+    --prov-leinster:#2a78d6;      --prov-leinster-fill:#d0e1f6;
+    --prov-munster:#1baf7a;       --prov-munster-fill:#cdede2;
+    --prov-connacht:#eb6834;      --prov-connacht-fill:#fbded2;
+    --prov-ulster:#8f7c68;        --prov-ulster-fill:#e0dad5;
+
+    /* Default (unassigned) technician-status color, before JS assigns one */
+    --tech-status-color:#6b7075;
+    --tech-status-tint:#eceef0;
+
+    /* Categorical palette (8 fixed slots, assigned in board-list order by JS) */
+    --cat-1:#2a78d6; --cat-1-tint:#e0ebf9;
+    --cat-2:#eb6834; --cat-2-tint:#fce9e2;
+    --cat-3:#1baf7a; --cat-3-tint:#def3ec;
+    --cat-4:#eda100; --cat-4-tint:#fcf1da;
+    --cat-5:#e87ba4; --cat-5-tint:#fcecf2;
+    --cat-6:#008300; --cat-6-tint:#daedda;
+    --cat-7:#4a3aa7; --cat-7-tint:#e5e2f2;
+    --cat-8:#e34948; --cat-8-tint:#fbe5e4;
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark){
+      color-scheme: dark;
+      --page-bg:#0f0f10;
+      --surface:#1c1c1e;
+      --header-bg:#000000;
+      --ink-primary:#f5f5f4;
+      --ink-secondary:#c3c2b7;
+      --ink-muted:#8a929b;
+      --border:#2c2c2e;
+      --border-strong:#3a3a3d;
+      --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+      --shadow-2: 0 8px 28px rgba(0,0,0,.5);
+
+      --status-good-tint:#174419;
+      --status-warning-tint:#5a461d;
+      --status-critical-tint:#522527;
+
+      --prov-leinster:#3987e5;  --prov-leinster-fill:#2a5282;
+      --prov-munster:#199e70;   --prov-munster-fill:#1a5d47;
+      --prov-connacht:#d95926;  --prov-connacht-fill:#7a3a22;
+      --prov-ulster:#a0907f;    --prov-ulster-fill:#61564a;
+
+      --tech-status-color:#9a9fa5;
+      --tech-status-tint:#2c2c2e;
+
+      --cat-1:#3987e5; --cat-1-tint:#253c5a;
+      --cat-2:#d95926; --cat-2-tint:#552e20;
+      --cat-3:#199e70; --cat-3-tint:#1b4337;
+      --cat-4:#c98500; --cat-4-tint:#503c15;
+      --cat-5:#d55181; --cat-5-tint:#542c3c;
+      --cat-6:#008300; --cat-6-tint:#143b15;
+      --cat-7:#9085e9; --cat-7-tint:#3f3c5b;
+      --cat-8:#e66767; --cat-8-tint:#593234;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --page-bg:#0f0f10;
+    --surface:#1c1c1e;
+    --header-bg:#000000;
+    --ink-primary:#f5f5f4;
+    --ink-secondary:#c3c2b7;
+    --ink-muted:#8a929b;
+    --border:#2c2c2e;
+    --border-strong:#3a3a3d;
+    --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+    --shadow-2: 0 8px 28px rgba(0,0,0,.5);
+
+    --status-good-tint:#174419;
+    --status-warning-tint:#5a461d;
+    --status-critical-tint:#522527;
+
+    --prov-leinster:#3987e5;  --prov-leinster-fill:#2a5282;
+    --prov-munster:#199e70;   --prov-munster-fill:#1a5d47;
+    --prov-connacht:#d95926;  --prov-connacht-fill:#7a3a22;
+    --prov-ulster:#a0907f;    --prov-ulster-fill:#61564a;
+
+    --tech-status-color:#9a9fa5;
+    --tech-status-tint:#2c2c2e;
+
+    --cat-1:#3987e5; --cat-1-tint:#253c5a;
+    --cat-2:#d95926; --cat-2-tint:#552e20;
+    --cat-3:#199e70; --cat-3-tint:#1b4337;
+    --cat-4:#c98500; --cat-4-tint:#503c15;
+    --cat-5:#d55181; --cat-5-tint:#542c3c;
+    --cat-6:#008300; --cat-6-tint:#143b15;
+    --cat-7:#9085e9; --cat-7-tint:#3f3c5b;
+    --cat-8:#e66767; --cat-8-tint:#593234;
   }
   *{box-sizing:border-box;}
   body{
     margin:0;
     font-family:'DM Sans', system-ui, sans-serif;
-    background:var(--grey-50);
-    color:var(--black);
+    background:var(--page-bg);
+    color:var(--ink-primary);
+    -webkit-font-smoothing:antialiased;
   }
   header{
-    background:var(--black);
+    background:var(--header-bg);
     color:var(--white);
     padding:16px 24px;
     display:flex;
@@ -37,6 +142,7 @@
     justify-content:space-between;
     flex-wrap:wrap;
     gap:12px;
+    border-bottom:1px solid rgba(255,255,255,.06);
   }
   header .brand{
     display:flex;
@@ -44,10 +150,11 @@
     gap:10px;
     font-weight:700;
     font-size:18px;
-    letter-spacing:0.2px;
+    letter-spacing:0.1px;
   }
   header .brand .dot{
-    width:10px;height:10px;border-radius:50%;background:var(--red);
+    width:9px;height:9px;border-radius:50%;background:var(--red);
+    box-shadow:0 0 0 3px rgba(200,16,46,.18);
   }
   header .actions{
     display:flex;gap:8px;align-items:center;
@@ -60,12 +167,23 @@
     font-weight:600;
     font-size:14px;
     cursor:pointer;
-    transition:opacity .15s ease;
+    transition:opacity .15s ease, transform .1s ease, background-color .15s ease;
   }
   .btn:hover{opacity:.88;}
+  .btn:active{transform:translateY(1px);}
+  .btn:focus-visible{outline:2px solid var(--red);outline-offset:2px;}
   .btn-primary{background:var(--red);color:var(--white);}
   .btn-ghost{background:rgba(255,255,255,0.1);color:var(--white);}
-  .btn-secondary{background:var(--grey-100);color:var(--black);}
+  .btn-secondary{background:var(--border);color:var(--ink-primary);}
+  .icon-btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:34px;height:34px;border-radius:8px;border:none;cursor:pointer;
+    background:rgba(255,255,255,0.1);color:var(--white);
+    transition:background-color .15s ease;
+  }
+  .icon-btn:hover{background:rgba(255,255,255,0.18);}
+  .icon-btn:focus-visible{outline:2px solid var(--white);outline-offset:2px;}
+  .icon-btn svg{width:17px;height:17px;}
   main{
     max-width:1200px;
     margin:0 auto;
@@ -81,16 +199,17 @@
   }
   .view-toggle{
     display:flex;
-    background:var(--grey-100);
+    background:var(--border);
     border-radius:8px;
     padding:3px;
   }
   .view-toggle button{
     border:none;background:transparent;padding:7px 14px;border-radius:6px;
-    font-family:inherit;font-weight:600;font-size:13px;cursor:pointer;color:var(--grey-700);
+    font-family:inherit;font-weight:600;font-size:13px;cursor:pointer;color:var(--ink-secondary);
+    transition:background-color .15s ease, color .15s ease;
   }
-  .view-toggle button.active{background:var(--white);color:var(--black);box-shadow:var(--shadow);}
-  #status-line{font-size:13px;color:var(--grey-500);}
+  .view-toggle button.active{background:var(--surface);color:var(--ink-primary);box-shadow:var(--shadow-1);}
+  #status-line{font-size:13px;color:rgba(255,255,255,.62);}
   #map-view{display:flex;flex-direction:column;gap:20px;}
   .layout{
     display:grid;
@@ -102,48 +221,46 @@
     .layout{grid-template-columns:1fr;}
   }
   .card-panel{
-    background:var(--white);
+    background:var(--surface);
     border-radius:14px;
-    box-shadow:var(--shadow);
+    box-shadow:var(--shadow-1);
+    border:1px solid var(--border);
     padding:16px;
   }
   #map-wrap{position:relative;}
   .map-error{
-    background:#fdecec;color:#9c2b2b;border:1px solid #f3c6c6;border-radius:10px;
-    padding:12px 14px;font-size:13px;line-height:1.5;margin:0 0 14px;
+    background:var(--status-critical-tint);color:var(--status-critical);border:1px solid var(--status-critical);
+    border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.5;margin:0 0 14px;
   }
-  .map-error code{background:rgba(0,0,0,0.06);padding:1px 5px;border-radius:4px;font-size:12px;}
+  .map-error code{background:rgba(128,128,128,0.16);padding:1px 5px;border-radius:4px;font-size:12px;}
   #ireland-map{width:100%;height:auto;display:block;}
-  #ireland-map .water{fill:var(--grey-100);}
+  #ireland-map .water{fill:var(--border);}
   .county{
-    stroke:var(--white);stroke-width:1.1;stroke-linejoin:round;
+    stroke:var(--surface);stroke-width:1.1;stroke-linejoin:round;
     cursor:pointer;transition:filter .12s ease,stroke-width .12s ease;
   }
   .county:hover{filter:brightness(1.08) saturate(1.08);}
-  .county.has-tech{stroke:var(--black);stroke-width:2.2;}
-  .county.leinster{fill:#b9cdE8;}
-  .county.munster{fill:#b7ddc3;}
-  .county.connacht{fill:#f3d59e;}
-  .county.ulster{fill:#f0bfcd;}
+  .county.has-tech{stroke:var(--ink-primary);stroke-width:2.2;}
+  .county.leinster{fill:var(--prov-leinster-fill);}
+  .county.munster{fill:var(--prov-munster-fill);}
+  .county.connacht{fill:var(--prov-connacht-fill);}
+  .county.ulster{fill:var(--prov-ulster-fill);}
   .county-label{
-    font-size:10px;fill:var(--grey-700);pointer-events:none;
+    font-size:10px;fill:var(--ink-secondary);pointer-events:none;
     font-family:'DM Sans',sans-serif;font-weight:600;text-anchor:middle;
-    paint-order:stroke fill;stroke:var(--white);stroke-width:3px;stroke-linejoin:round;
+    paint-order:stroke fill;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round;
   }
-  .map-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;padding-top:10px;border-top:1px solid var(--grey-100);}
-  .map-legend .item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--grey-700);}
+  .map-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+  .map-legend .item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-secondary);}
   .map-legend .swatch{width:11px;height:11px;border-radius:3px;flex:none;}
-  .map-legend .swatch.leinster{background:#b9cdE8;}
-  .map-legend .swatch.munster{background:#b7ddc3;}
-  .map-legend .swatch.connacht{background:#f3d59e;}
-  .map-legend .swatch.ulster{background:#f0bfcd;}
+  .map-legend .swatch.leinster{background:var(--prov-leinster);}
+  .map-legend .swatch.munster{background:var(--prov-munster);}
+  .map-legend .swatch.connacht{background:var(--prov-connacht);}
+  .map-legend .swatch.ulster{background:var(--prov-ulster);}
   .tech-marker{cursor:pointer;}
-  .tech-marker circle.avatar-bg{fill:var(--red);stroke:var(--white);stroke-width:2;}
-  .tech-marker.status-Scheduled circle.avatar-bg{fill:#4a6fa5;}
-  .tech-marker.status-Waiting-on-parts circle.avatar-bg{fill:#7a5cc4;}
-  .tech-marker.status-Completed circle.avatar-bg{fill:var(--ok);}
-  .tech-marker .badge-bg{fill:var(--white);stroke:var(--grey-300);stroke-width:1;}
-  .tech-marker .badge-text{font-size:7.5px;font-weight:700;fill:var(--black);text-anchor:middle;}
+  .tech-marker circle.avatar-bg{fill:var(--tech-status-color);stroke:var(--surface);stroke-width:2;}
+  .tech-marker .badge-bg{fill:var(--surface);stroke:var(--border-strong);stroke-width:1;}
+  .tech-marker .badge-text{font-size:7.5px;font-weight:700;fill:var(--ink-primary);text-anchor:middle;}
   .tech-marker:hover{filter:brightness(1.06);}
   .tech-list{list-style:none;margin:0;padding:0;}
   .tech-row{
@@ -154,8 +271,9 @@
     border-radius:10px;
     cursor:pointer;
     border:1px solid transparent;
+    transition:background-color .12s ease, border-color .12s ease;
   }
-  .tech-row:hover{background:var(--grey-50);border-color:var(--grey-100);}
+  .tech-row:hover{background:var(--page-bg);border-color:var(--border);}
   .avatar{
     width:36px;height:36px;border-radius:50%;
     background:var(--red);color:var(--white);
@@ -163,98 +281,111 @@
     font-weight:700;font-size:14px;flex-shrink:0;
   }
   .status-pill{
-    font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;
-    background:#f3c6cd;color:var(--red);white-space:nowrap;
+    display:inline-flex;align-items:center;gap:5px;
+    font-size:11px;font-weight:700;padding:3px 9px 3px 7px;border-radius:999px;
+    background:var(--tech-status-tint);color:var(--tech-status-color);white-space:nowrap;
   }
-  .status-pill.status-Scheduled{background:#dbe6f3;color:#2c4770;}
-  .status-pill.status-Waiting-on-parts{background:#e6ddf7;color:#5c3fa3;}
-  .status-pill.status-Completed{background:#d4f0de;color:var(--ok);}
-  .tech-meta{font-size:12.5px;color:var(--grey-500);margin-top:2px;}
+  .status-pill::before{
+    content:'';width:6px;height:6px;border-radius:50%;background:currentColor;flex:none;
+  }
+  .tech-meta{font-size:12.5px;color:var(--ink-muted);margin-top:2px;}
   .tech-name{font-weight:600;font-size:14.5px;}
   .calendar-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
   .calendar-nav{display:flex;gap:6px;}
   .calendar-nav .btn{padding:6px 12px;font-size:13px;}
   .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
-  .calendar-dow{font-size:11px;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;text-align:center;padding-bottom:4px;}
+  .calendar-dow{font-size:11px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.04em;text-align:center;padding-bottom:4px;}
   .calendar-day{
-    min-height:64px;border-radius:8px;background:var(--grey-50);
+    min-height:64px;border-radius:8px;background:var(--page-bg);
     padding:5px 5px 6px;display:flex;flex-direction:column;gap:3px;
   }
   .calendar-day.other-month{background:transparent;}
-  .calendar-day.other-month .day-num{color:var(--grey-300);}
-  .calendar-day.today{background:#fdecec;}
-  .calendar-day .day-num{font-size:11.5px;font-weight:600;color:var(--grey-700);}
-  .calendar-day.today .day-num{color:var(--red);}
+  .calendar-day.other-month .day-num{color:var(--border-strong);}
+  .calendar-day.today{background:var(--status-critical-tint);}
+  .calendar-day .day-num{font-size:11.5px;font-weight:600;color:var(--ink-secondary);}
+  .calendar-day.today .day-num{color:var(--status-critical);}
   .calendar-chip{
     display:flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;
     padding:2px 6px;border-radius:999px;cursor:pointer;color:var(--white);
-    background:var(--red);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    background:var(--tech-status-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
-  .calendar-chip.status-Scheduled{background:#4a6fa5;}
-  .calendar-chip.status-Waiting-on-parts{background:#7a5cc4;}
-  .calendar-chip.status-Completed{background:var(--ok);}
-  .calendar-more{font-size:10px;color:var(--grey-500);padding-left:6px;}
+  .calendar-more{font-size:10px;color:var(--ink-muted);padding-left:6px;}
   @media (max-width:600px){
     .calendar-day{min-height:44px;font-size:10px;}
     .calendar-dow{font-size:9.5px;}
   }
   .projects-toolbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
   .projects-toolbar h2{margin:0;font-size:18px;}
-  .projects-toolbar p{margin:4px 0 0;font-size:13px;color:var(--grey-500);max-width:520px;}
+  .projects-toolbar p{margin:4px 0 0;font-size:13px;color:var(--ink-muted);max-width:520px;}
   #projects-list{display:flex;flex-direction:column;gap:14px;}
-  .project-card{background:var(--white);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;cursor:pointer;}
+  .project-card{
+    background:var(--surface);border-radius:14px;box-shadow:var(--shadow-1);border:1px solid var(--border);
+    padding:16px 18px;cursor:pointer;transition:box-shadow .15s ease;
+  }
+  .project-card:hover{box-shadow:var(--shadow-2);}
   .project-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
   .project-card h3{margin:0 0 2px;font-size:15.5px;}
-  .project-card .project-meta{font-size:12.5px;color:var(--grey-500);}
-  .priority-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;flex:none;}
-  .priority-badge.priority-Low{background:#d4f0de;color:var(--ok);}
-  .priority-badge.priority-Medium{background:#fde3bf;color:#a15c00;}
-  .priority-badge.priority-High{background:#f3c6cd;color:var(--red);}
-  .deadline-pill{font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--grey-100);color:var(--grey-700);white-space:nowrap;}
-  .deadline-pill.overdue{background:#f3c6cd;color:var(--red);font-weight:700;}
+  .project-card .project-meta{font-size:12.5px;color:var(--ink-muted);}
+  .priority-badge{
+    display:inline-flex;align-items:center;gap:5px;
+    font-size:11px;font-weight:700;padding:3px 9px 3px 7px;border-radius:999px;white-space:nowrap;flex:none;
+  }
+  .priority-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;flex:none;}
+  .priority-badge.priority-Low{background:var(--status-good-tint);color:var(--status-good);}
+  .priority-badge.priority-Medium{background:var(--status-warning-tint);color:var(--status-warning);}
+  .priority-badge.priority-High{background:var(--status-critical-tint);color:var(--status-critical);}
+  .deadline-pill{font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--border);color:var(--ink-secondary);white-space:nowrap;}
+  .deadline-pill.overdue{background:var(--status-critical-tint);color:var(--status-critical);font-weight:700;}
+  .deadline-pill.due-today{background:var(--status-warning-tint);color:var(--status-warning);font-weight:700;}
   .progress-row{display:flex;align-items:center;gap:10px;margin:12px 0 4px;}
-  .progress-track{flex:1;height:8px;border-radius:999px;background:var(--grey-100);overflow:hidden;}
-  .progress-fill{height:100%;border-radius:999px;transition:width .2s ease;background:var(--grey-700);}
-  .progress-fill.priority-Low{background:var(--ok);}
-  .progress-fill.priority-Medium{background:var(--warn);}
-  .progress-fill.priority-High{background:var(--red);}
-  .progress-label{font-size:12px;font-weight:700;color:var(--grey-700);width:34px;text-align:right;flex:none;}
-  .project-notes{font-size:13px;color:var(--grey-700);margin:10px 0 0;line-height:1.5;white-space:pre-wrap;}
-  .project-techs{border-top:1px solid var(--grey-100);padding-top:10px;margin-top:14px;cursor:default;}
-  .project-techs-label{font-size:11px;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;}
-  .project-techs-empty{font-size:12.5px;color:var(--grey-500);padding:8px 4px 2px;}
+  .progress-track{flex:1;height:8px;border-radius:999px;background:var(--border);overflow:hidden;}
+  .progress-fill{height:100%;border-radius:999px;transition:width .2s ease;background:var(--ink-secondary);}
+  .progress-fill.priority-Low{background:var(--status-good);}
+  .progress-fill.priority-Medium{background:var(--status-warning);}
+  .progress-fill.priority-High{background:var(--status-critical);}
+  .progress-track.priority-Low{background:var(--status-good-tint);}
+  .progress-track.priority-Medium{background:var(--status-warning-tint);}
+  .progress-track.priority-High{background:var(--status-critical-tint);}
+  .progress-label{font-size:12px;font-weight:700;color:var(--ink-secondary);width:34px;text-align:right;flex:none;font-variant-numeric:tabular-nums;}
+  .project-notes{font-size:13px;color:var(--ink-secondary);margin:10px 0 0;line-height:1.5;white-space:pre-wrap;}
+  .project-techs{border-top:1px solid var(--border);padding-top:10px;margin-top:14px;cursor:default;}
+  .project-techs-label{font-size:11px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;}
+  .project-techs-empty{font-size:12.5px;color:var(--ink-muted);padding:8px 4px 2px;}
   .project-card .tech-row{padding:10px 6px;cursor:pointer;}
-  .project-card .tech-row + .tech-row{border-top:1px solid var(--grey-100);}
+  .project-card .tech-row + .tech-row{border-top:1px solid var(--border);}
   .table-view table{width:100%;border-collapse:collapse;font-size:13.5px;}
-  .table-view th{text-align:left;color:var(--grey-500);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:8px 10px;border-bottom:2px solid var(--grey-100);}
-  .table-view td{padding:10px;border-bottom:1px solid var(--grey-100);}
-  .table-view tr:hover{background:var(--grey-50);cursor:pointer;}
-  .empty-note{color:var(--grey-500);font-size:13.5px;padding:20px;text-align:center;}
+  .table-view th{text-align:left;color:var(--ink-muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:8px 10px;border-bottom:2px solid var(--border);}
+  .table-view td{padding:10px;border-bottom:1px solid var(--border);}
+  .table-view tr:hover{background:var(--page-bg);cursor:pointer;}
+  .empty-note{color:var(--ink-muted);font-size:13.5px;padding:20px;text-align:center;}
   /* Modal */
   .modal-backdrop{
-    position:fixed;inset:0;background:rgba(17,17,17,0.5);
+    position:fixed;inset:0;background:rgba(0,0,0,0.55);
     display:flex;align-items:center;justify-content:center;
     padding:20px;z-index:50;
   }
   .modal{
-    background:var(--white);border-radius:14px;padding:24px;
-    width:100%;max-width:420px;box-shadow:0 10px 40px rgba(0,0,0,0.25);
+    background:var(--surface);border-radius:14px;padding:24px;color:var(--ink-primary);
+    width:100%;max-width:420px;box-shadow:var(--shadow-2);
     max-height:90vh;overflow-y:auto;
   }
   .modal h2{margin:0 0 4px;font-size:18px;}
-  .modal .subtitle{color:var(--grey-500);font-size:13px;margin-bottom:16px;}
+  .modal .subtitle{color:var(--ink-muted);font-size:13px;margin-bottom:16px;}
   .field{margin-bottom:14px;}
   .field-row{display:flex;gap:10px;}
   .field-row .field{flex:1;}
-  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--grey-700);margin-bottom:5px;}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-secondary);margin-bottom:5px;}
   .field input, .field select, .field textarea{
-    width:100%;padding:9px 11px;border:1.5px solid var(--grey-100);border-radius:8px;
-    font-family:inherit;font-size:14px;background:var(--grey-50);
+    width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;
+    font-family:inherit;font-size:14px;background:var(--page-bg);color:var(--ink-primary);
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline:none;border-color:var(--red);
   }
   .field textarea{resize:vertical;min-height:60px;}
   .modal-actions{display:flex;justify-content:space-between;gap:8px;margin-top:20px;}
   .modal-actions .left{display:flex;gap:8px;}
-  .hint{font-size:12px;color:var(--grey-500);margin-top:10px;}
+  .hint{font-size:12px;color:var(--ink-muted);margin-top:10px;}
   a.trello-link{color:var(--red);font-weight:600;text-decoration:none;font-size:13px;}
   [hidden]{display:none!important;}
 </style>
@@ -265,6 +396,10 @@
   <div class="brand"><span class="dot"></span> Irlequip — Road Tech Tracker</div>
   <div class="actions">
     <span id="status-line" style="color:rgba(255,255,255,.6);"></span>
+    <button class="icon-btn" id="theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
+      <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+      <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </button>
     <button class="btn btn-ghost" id="refresh-btn">Refresh</button>
     <button class="btn btn-primary" id="add-btn">+ Add technician</button>
   </div>
@@ -470,12 +605,94 @@ let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
 
 const $ = (sel) => document.querySelector(sel);
 
+// --- Theme (light/dark) ---------------------------------------------------
+// Explicit choice wins over the OS setting and is remembered; with no saved
+// choice we follow prefers-color-scheme (handled by the CSS itself) and just
+// keep the toggle icon/label in sync with whichever mode is actually showing.
+const THEME_KEY = 'rtt-theme';
+
+function currentTheme(){
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === 'light' || saved === 'dark') return saved;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function applyTheme(theme, { persist } = {}){
+  document.documentElement.setAttribute('data-theme', theme);
+  if (persist) {
+    try { localStorage.setItem(THEME_KEY, theme); } catch (err) { /* private mode etc — ignore */ }
+  }
+  const toggle = $('#theme-toggle');
+  const sun = $('#theme-icon-sun');
+  const moon = $('#theme-icon-moon');
+  if (toggle && sun && moon) {
+    const isDark = theme === 'dark';
+    // Plain HTML elements reflect `.hidden` to the attribute automatically, but
+    // these are <svg> elements — some browsers don't wire up the IDL property
+    // for SVG, so set/remove the attribute directly rather than via `.hidden`.
+    sun.toggleAttribute('hidden', isDark);
+    moon.toggleAttribute('hidden', !isDark);
+    const label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+    toggle.setAttribute('aria-label', label);
+    toggle.setAttribute('title', label);
+  }
+}
+
+function initTheme(){
+  applyTheme(currentTheme());
+  // Follow OS changes live, but only while the user hasn't made an explicit choice.
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    if (localStorage.getItem(THEME_KEY)) return;
+    applyTheme(e.matches ? 'dark' : 'light');
+  });
+}
+
+function toggleTheme(){
+  applyTheme(currentTheme() === 'dark' ? 'light' : 'dark', { persist: true });
+}
+
+initTheme(); // run immediately (script is at end of body) so there's no flash of the wrong theme
+
 function initials(name){
   return name.split(/\s+/).filter(Boolean).slice(0,2).map(p=>p[0].toUpperCase()).join('');
 }
 
 function statusClass(status){
   return 'status-' + (status || 'On site').replace(/\s+/g,'-');
+}
+
+// Categorical color assignment: each distinct technician status gets the next
+// fixed palette slot, in the order statuses appear on the Trello board (never
+// re-sorted, never cycled — see the dataviz skill's categorical-color rule).
+// Past the 8 validated slots, further statuses fall back to a neutral grey
+// rather than reusing a slot or inventing a new hue.
+function statusSlot(status){
+  const name = status || 'On site';
+  const idx = statuses.findIndex(s => s.name === name);
+  return (idx >= 0 && idx < 8) ? idx + 1 : null;
+}
+
+// Sets --tech-status-color / --tech-status-tint as inline custom properties on
+// `el`, pointing at the matching --cat-N / --cat-N-tint tokens (which already
+// carry both light and dark values) so the color follows the theme with no
+// re-render needed. Falls back to the default grey tokens defined in :root.
+function applyStatusVars(el, status){
+  const slot = statusSlot(status);
+  if (slot){
+    el.style.setProperty('--tech-status-color', `var(--cat-${slot})`);
+    el.style.setProperty('--tech-status-tint', `var(--cat-${slot}-tint)`);
+  } else {
+    el.style.removeProperty('--tech-status-color');
+    el.style.removeProperty('--tech-status-tint');
+  }
+}
+
+// Same assignment as applyStatusVars, but as an inline-style string for use
+// inside innerHTML template strings (status pills, calendar chips) rather
+// than on a live DOM element.
+function statusVarsCss(status){
+  const slot = statusSlot(status);
+  return slot ? `--tech-status-color:var(--cat-${slot});--tech-status-tint:var(--cat-${slot}-tint);` : '';
 }
 
 function buildMap(){
@@ -624,6 +841,7 @@ function renderMarkers(){
       g.setAttribute('class', 'tech-marker ' + statusClass(t.status));
       g.setAttribute('transform', `translate(${mx},${my})`);
       g.setAttribute('filter', 'url(#marker-shadow)');
+      applyStatusVars(g, t.status);
       g.addEventListener('click', (e) => { e.stopPropagation(); openEditModal(t); });
 
       const title = document.createElementNS(ns,'title');
@@ -681,7 +899,7 @@ function renderList(){
         <div class="tech-name">${escapeHtml(t.name)}</div>
         <div class="tech-meta">${escapeHtml(t.county || 'No county set')}${t.customer ? ' · ' + escapeHtml(t.customer) : ''}</div>
       </div>
-      <span class="status-pill ${statusClass(t.status)}">${escapeHtml(t.status || 'On site')}</span>
+      <span class="status-pill ${statusClass(t.status)}" style="${statusVarsCss(t.status)}">${escapeHtml(t.status || 'On site')}</span>
     `;
     li.addEventListener('click', () => openEditModal(t));
     list.appendChild(li);
@@ -702,7 +920,7 @@ function renderTable(){
       <td>${escapeHtml(t.county || '—')}</td>
       <td>${escapeHtml(t.customer || '—')}</td>
       <td>${escapeHtml(t.machine || '—')}</td>
-      <td><span class="status-pill ${statusClass(t.status)}">${escapeHtml(t.status || 'On site')}</span></td>
+      <td><span class="status-pill ${statusClass(t.status)}" style="${statusVarsCss(t.status)}">${escapeHtml(t.status || 'On site')}</span></td>
       <td>${formatDate(t.date) || formatTime(t.updated)}</td>
     `;
     tr.addEventListener('click', () => openEditModal(t));
@@ -755,7 +973,9 @@ function renderProjectsList(){
 
   sorted.forEach(p => {
     const assigned = techniciansForProject(p);
-    const overdue = p.progress < 100 && daysUntil(p.deadline) !== null && daysUntil(p.deadline) < 0;
+    const daysLeft = daysUntil(p.deadline);
+    const overdue = p.progress < 100 && daysLeft !== null && daysLeft < 0;
+    const dueToday = p.progress < 100 && daysLeft === 0;
 
     const card = document.createElement('div');
     card.className = 'project-card';
@@ -765,13 +985,13 @@ function renderProjectsList(){
           <h3>${escapeHtml(p.name)}</h3>
           <div class="project-meta">
             ${p.customer ? escapeHtml(p.customer) : 'No customer set'}
-            ${p.deadline ? ` · <span class="deadline-pill${overdue ? ' overdue' : ''}">${escapeHtml(deadlineLabel(p))}</span>` : ''}
+            ${p.deadline ? ` · <span class="deadline-pill${overdue ? ' overdue' : dueToday ? ' due-today' : ''}">${escapeHtml(deadlineLabel(p))}</span>` : ''}
           </div>
         </div>
         <span class="priority-badge priority-${p.priority}">${escapeHtml(p.priority)}</span>
       </div>
       <div class="progress-row">
-        <div class="progress-track"><div class="progress-fill priority-${p.priority}" style="width:${p.progress}%"></div></div>
+        <div class="progress-track priority-${p.priority}"><div class="progress-fill priority-${p.priority}" style="width:${p.progress}%"></div></div>
         <span class="progress-label">${p.progress}%</span>
       </div>
       ${p.notes ? `<p class="project-notes">${escapeHtml(p.notes)}</p>` : ''}
@@ -798,7 +1018,7 @@ function renderProjectsList(){
             <div class="tech-name">${escapeHtml(t.name)}</div>
             <div class="tech-meta">${escapeHtml(t.county || 'No county set')}${t.problem ? ' · ' + escapeHtml(t.problem) : ''}</div>
           </div>
-          <span class="status-pill ${statusClass(t.status)}">${escapeHtml(t.status || 'On site')}</span>
+          <span class="status-pill ${statusClass(t.status)}" style="${statusVarsCss(t.status)}">${escapeHtml(t.status || 'On site')}</span>
         `;
         row.addEventListener('click', (e) => { e.stopPropagation(); openEditModal(t); });
         techsWrap.appendChild(row);
@@ -1018,6 +1238,7 @@ function renderCalendar(){
     list.slice(0, 3).forEach(t => {
       const chip = document.createElement('div');
       chip.className = 'calendar-chip ' + statusClass(t.status);
+      applyStatusVars(chip, t.status);
       chip.textContent = t.name;
       chip.title = `${t.name} · ${t.status || 'On site'}`;
       chip.addEventListener('click', () => openEditModal(t));
@@ -1190,6 +1411,7 @@ $('#tab-list').addEventListener('click', () => setView('list'));
 $('#tab-projects').addEventListener('click', () => setView('projects'));
 $('#add-btn').addEventListener('click', () => openAddModalForCounty(''));
 $('#refresh-btn').addEventListener('click', () => loadTechnicians());
+$('#theme-toggle').addEventListener('click', toggleTheme);
 $('#cancel-btn').addEventListener('click', closeModal);
 $('#save-btn').addEventListener('click', saveTechnician);
 $('#archive-btn').addEventListener('click', archiveTechnician);
