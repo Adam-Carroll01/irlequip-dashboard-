@@ -108,16 +108,37 @@
   }
   #map-wrap{position:relative;}
   #ireland-map{width:100%;height:auto;display:block;}
-  .county-dot{fill:var(--grey-300);stroke:var(--white);stroke-width:1.5;cursor:pointer;transition:fill .15s;}
-  .county-dot:hover{fill:var(--grey-500);}
-  .county-dot.has-tech{fill:#f3c6cd;}
-  .county-label{font-size:6px;fill:var(--grey-700);pointer-events:none;font-family:'DM Sans',sans-serif;}
+  #ireland-map .water{fill:var(--grey-100);}
+  .county{
+    stroke:var(--white);stroke-width:1.1;stroke-linejoin:round;
+    cursor:pointer;transition:filter .12s ease,stroke-width .12s ease;
+  }
+  .county:hover{filter:brightness(1.08) saturate(1.08);}
+  .county.has-tech{stroke:var(--black);stroke-width:2.2;}
+  .county.leinster{fill:#b9cdE8;}
+  .county.munster{fill:#b7ddc3;}
+  .county.connacht{fill:#f3d59e;}
+  .county.ulster{fill:#f0bfcd;}
+  .county-label{
+    font-size:10px;fill:var(--grey-700);pointer-events:none;
+    font-family:'DM Sans',sans-serif;font-weight:600;text-anchor:middle;
+    paint-order:stroke fill;stroke:var(--white);stroke-width:3px;stroke-linejoin:round;
+  }
+  .map-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;padding-top:10px;border-top:1px solid var(--grey-100);}
+  .map-legend .item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--grey-700);}
+  .map-legend .swatch{width:11px;height:11px;border-radius:3px;flex:none;}
+  .map-legend .swatch.leinster{background:#b9cdE8;}
+  .map-legend .swatch.munster{background:#b7ddc3;}
+  .map-legend .swatch.connacht{background:#f3d59e;}
+  .map-legend .swatch.ulster{background:#f0bfcd;}
   .tech-marker{cursor:pointer;}
-  .tech-marker circle.avatar-bg{fill:var(--red);stroke:var(--white);stroke-width:1.4;}
-  .tech-marker text.avatar-initial{fill:var(--white);font-size:6.5px;font-weight:700;text-anchor:middle;}
+  .tech-marker circle.avatar-bg{fill:var(--red);stroke:var(--white);stroke-width:2;}
   .tech-marker.status-Scheduled circle.avatar-bg{fill:#4a6fa5;}
   .tech-marker.status-Waiting-on-parts circle.avatar-bg{fill:#7a5cc4;}
   .tech-marker.status-Completed circle.avatar-bg{fill:var(--ok);}
+  .tech-marker .badge-bg{fill:var(--white);stroke:var(--grey-300);stroke-width:1;}
+  .tech-marker .badge-text{font-size:7.5px;font-weight:700;fill:var(--black);text-anchor:middle;}
+  .tech-marker:hover{filter:brightness(1.06);}
   .tech-list{list-style:none;margin:0;padding:0;}
   .tech-row{
     display:flex;
@@ -144,6 +165,12 @@
   .status-pill.status-Completed{background:#d4f0de;color:var(--ok);}
   .tech-meta{font-size:12.5px;color:var(--grey-500);margin-top:2px;}
   .tech-name{font-weight:600;font-size:14.5px;}
+  #projects-list{display:flex;flex-direction:column;gap:14px;}
+  .project-card{background:var(--white);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;}
+  .project-card h3{margin:0 0 2px;font-size:15.5px;}
+  .project-card .project-meta{font-size:12.5px;color:var(--grey-500);margin-bottom:10px;}
+  .project-card .tech-row{padding:10px 6px;}
+  .project-card .tech-row + .tech-row{border-top:1px solid var(--grey-100);}
   .table-view table{width:100%;border-collapse:collapse;font-size:13.5px;}
   .table-view th{text-align:left;color:var(--grey-500);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:8px 10px;border-bottom:2px solid var(--grey-100);}
   .table-view td{padding:10px;border-bottom:1px solid var(--grey-100);}
@@ -192,12 +219,19 @@
     <div class="view-toggle">
       <button id="tab-map" class="active">Map</button>
       <button id="tab-list">List</button>
+      <button id="tab-projects">Projects</button>
     </div>
   </div>
 
   <div id="map-view" class="layout">
     <div class="card-panel" id="map-wrap">
-      <svg id="ireland-map" viewBox="0 0 400 400"></svg>
+      <svg id="ireland-map" viewBox="0 0 760 981.3"></svg>
+      <div class="map-legend">
+        <span class="item"><span class="swatch leinster"></span>Leinster</span>
+        <span class="item"><span class="swatch munster"></span>Munster</span>
+        <span class="item"><span class="swatch connacht"></span>Connacht</span>
+        <span class="item"><span class="swatch ulster"></span>Ulster</span>
+      </div>
     </div>
     <div class="card-panel">
       <h3 style="margin-top:0;">On the road</h3>
@@ -213,6 +247,11 @@
       </thead>
       <tbody id="table-body"></tbody>
     </table>
+  </div>
+
+  <div id="projects-view" hidden>
+    <div id="projects-list"></div>
+    <p class="empty-note" id="projects-empty-note" hidden>No technicians logged yet. Click "+ Add technician" to get started.</p>
   </div>
 </main>
 
@@ -263,40 +302,15 @@
 </div>
 
 <script>
-const COUNTIES = [
-  { code:'DON', name:'Donegal',   x:130, y:55  },
-  { code:'DER', name:'Derry',     x:213, y:65  },
-  { code:'ANT', name:'Antrim',    x:288, y:70  },
-  { code:'TYR', name:'Tyrone',    x:203, y:100 },
-  { code:'FER', name:'Fermanagh', x:163, y:117 },
-  { code:'DOW', name:'Down',      x:298, y:125 },
-  { code:'ARM', name:'Armagh',    x:248, y:130 },
-  { code:'MON', name:'Monaghan',  x:218, y:146 },
-  { code:'CAV', name:'Cavan',     x:174, y:151 },
-  { code:'SLI', name:'Sligo',     x:108, y:136 },
-  { code:'LEI', name:'Leitrim',   x:148, y:141 },
-  { code:'MAY', name:'Mayo',      x:62,  y:172 },
-  { code:'ROS', name:'Roscommon', x:138, y:187 },
-  { code:'GAL', name:'Galway',    x:92,  y:227 },
-  { code:'LNG', name:'Longford',  x:172, y:191 },
-  { code:'WEM', name:'Westmeath', x:192, y:206 },
-  { code:'LOU', name:'Louth',     x:257, y:171 },
-  { code:'MEA', name:'Meath',     x:232, y:201 },
-  { code:'DUB', name:'Dublin',    x:263, y:227 },
-  { code:'KID', name:'Kildare',   x:227, y:237 },
-  { code:'OFF', name:'Offaly',    x:192, y:236 },
-  { code:'LAO', name:'Laois',     x:207, y:251 },
-  { code:'WIC', name:'Wicklow',   x:252, y:257 },
-  { code:'CAR', name:'Carlow',    x:232, y:271 },
-  { code:'KIK', name:'Kilkenny',  x:207, y:281 },
-  { code:'WEX', name:'Wexford',   x:257, y:296 },
-  { code:'CLA', name:'Clare',     x:97,  y:266 },
-  { code:'TIP', name:'Tipperary', x:172, y:271 },
-  { code:'LIM', name:'Limerick',  x:127, y:296 },
-  { code:'WAT', name:'Waterford', x:197, y:306 },
-  { code:'KER', name:'Kerry',     x:72,  y:321 },
-  { code:'COR', name:'Cork',      x:137, y:341 },
-];
+// Real county shapes (32 counties, projected to the SVG viewBox below) —
+// loaded once from /counties-geo.json rather than hardcoded here.
+let COUNTY_GEO = null; // { width, height, counties: [{name,d,lx,ly,province,approx}] }
+
+async function loadCountyGeo(){
+  const r = await fetch('/counties-geo.json');
+  if (!r.ok) throw new Error('Could not load county map data');
+  COUNTY_GEO = await r.json();
+}
 
 let technicians = [];
 let statuses = []; // [{id, name}] — loaded from /api/config, in board list order
@@ -314,42 +328,78 @@ function statusClass(status){
 }
 
 function buildMap(){
+  if (!COUNTY_GEO) return;
   const svg = $('#ireland-map');
+  svg.setAttribute('viewBox', `0 0 ${COUNTY_GEO.width} ${COUNTY_GEO.height}`);
   svg.innerHTML = '';
   const ns = 'http://www.w3.org/2000/svg';
 
-  // soft backdrop suggesting the island outline (schematic, not geographic)
-  const bg = document.createElementNS(ns,'ellipse');
-  bg.setAttribute('cx','185'); bg.setAttribute('cy','205');
-  bg.setAttribute('rx','175'); bg.setAttribute('ry','195');
-  bg.setAttribute('fill','#f0f2f4');
+  // Reusable cartoon mechanic icon (orange overalls + hardhat), referenced
+  // by every technician marker via <use>. Defined once here.
+  const defs = document.createElementNS(ns,'defs');
+  defs.innerHTML = `
+    <symbol id="mechanic-icon" viewBox="0 0 20 26">
+      <ellipse cx="10" cy="24.5" rx="5.5" ry="1.2" fill="#000" opacity="0.12"/>
+      <rect x="5.5" y="22.5" width="3.4" height="3" rx="1" fill="#2b2b2e"/>
+      <rect x="11.1" y="22.5" width="3.4" height="3" rx="1" fill="#2b2b2e"/>
+      <rect x="4" y="14.5" width="12" height="9.5" rx="3.2" fill="#e8622a"/>
+      <rect x="1" y="15.5" width="3.2" height="6.5" rx="1.4" fill="#e8622a"/>
+      <rect x="15.8" y="15.5" width="3.2" height="6.5" rx="1.4" fill="#e8622a"/>
+      <circle cx="2.6" cy="21.6" r="1.3" fill="#f0b487"/>
+      <circle cx="17.4" cy="21.6" r="1.3" fill="#f0b487"/>
+      <line x1="10" y1="15.2" x2="10" y2="23.4" stroke="#c14e1f" stroke-width="0.8"/>
+      <rect x="6.4" y="17" width="2.6" height="2" rx="0.5" fill="#c14e1f"/>
+      <circle cx="10" cy="10.6" r="4.1" fill="#f0b487"/>
+      <path d="M4.6,7.6 A5.4,5.1 0 0 1 15.4,7.6 Z" fill="#f6b400"/>
+      <rect x="3.6" y="7.2" width="12.8" height="1.7" rx="0.85" fill="#d99a00"/>
+    </symbol>
+  `;
+  svg.appendChild(defs);
+
+  // sea backdrop behind the county shapes
+  const bg = document.createElementNS(ns,'rect');
+  bg.setAttribute('class','water');
+  bg.setAttribute('x','-40'); bg.setAttribute('y','-40');
+  bg.setAttribute('width', COUNTY_GEO.width + 80);
+  bg.setAttribute('height', COUNTY_GEO.height + 80);
   svg.appendChild(bg);
 
-  COUNTIES.forEach(c => {
-    const g = document.createElementNS(ns,'g');
+  const countyGroup = document.createElementNS(ns,'g');
+  const labelGroup = document.createElementNS(ns,'g');
 
-    const dot = document.createElementNS(ns,'circle');
-    dot.setAttribute('cx', c.x); dot.setAttribute('cy', c.y); dot.setAttribute('r', 9);
-    dot.setAttribute('class','county-dot');
-    dot.dataset.county = c.name;
-    dot.addEventListener('click', () => openAddModalForCounty(c.name));
-    g.appendChild(dot);
+  COUNTY_GEO.counties.forEach(c => {
+    const path = document.createElementNS(ns,'path');
+    path.setAttribute('d', c.d);
+    path.setAttribute('class', `county ${c.province.toLowerCase()}`);
+    path.dataset.county = c.name;
+    path.addEventListener('click', () => openAddModalForCounty(c.name));
+    const title = document.createElementNS(ns,'title');
+    title.textContent = `${c.name} · ${c.province}`;
+    path.appendChild(title);
+    countyGroup.appendChild(path);
 
     const label = document.createElementNS(ns,'text');
-    label.setAttribute('x', c.x); label.setAttribute('y', c.y + 15);
-    label.setAttribute('text-anchor','middle');
+    label.setAttribute('x', c.lx); label.setAttribute('y', c.ly);
     label.setAttribute('class','county-label');
-    label.textContent = c.code;
-    g.appendChild(label);
-
-    svg.appendChild(g);
+    label.setAttribute('font-size', String(c.fontSize || 10));
+    label.textContent = c.name;
+    label.style.pointerEvents = 'none';
+    labelGroup.appendChild(label);
   });
+
+  svg.appendChild(countyGroup);
+  svg.appendChild(labelGroup);
+}
+
+function countyByName(name){
+  return COUNTY_GEO?.counties.find(c => c.name === name);
 }
 
 function renderMarkers(){
+  if (!COUNTY_GEO) return;
   const svg = $('#ireland-map');
   svg.querySelectorAll('.tech-marker').forEach(el => el.remove());
-  svg.querySelectorAll('.county-dot').forEach(el => el.classList.remove('has-tech'));
+  svg.querySelectorAll('.county').forEach(el => el.classList.remove('has-tech'));
 
   const byCounty = {};
   technicians.forEach(t => {
@@ -360,29 +410,47 @@ function renderMarkers(){
 
   const ns = 'http://www.w3.org/2000/svg';
   Object.entries(byCounty).forEach(([countyName, list]) => {
-    const county = COUNTIES.find(c => c.name === countyName);
+    const county = countyByName(countyName);
     if (!county) return;
-    svg.querySelector(`.county-dot[data-county="${countyName}"]`)?.classList.add('has-tech');
+    svg.querySelector(`.county[data-county="${countyName}"]`)?.classList.add('has-tech');
 
     list.forEach((t, i) => {
       const angle = (i / Math.max(list.length,1)) * Math.PI * 2;
-      const offset = list.length > 1 ? 13 : 0;
-      const mx = county.x + Math.cos(angle) * offset;
-      const my = county.y - 16 + Math.sin(angle) * offset * 0.6;
+      const offset = list.length > 1 ? 32 : 0;
+      const mx = county.lx + Math.cos(angle) * offset;
+      const my = county.ly - 30 + Math.sin(angle) * offset * 0.6;
 
       const g = document.createElementNS(ns,'g');
       g.setAttribute('class', 'tech-marker ' + statusClass(t.status));
       g.setAttribute('transform', `translate(${mx},${my})`);
       g.addEventListener('click', (e) => { e.stopPropagation(); openEditModal(t); });
 
+      const title = document.createElementNS(ns,'title');
+      title.textContent = `${t.name} · ${t.status || 'On site'}`;
+      g.appendChild(title);
+
+      // Status-coloured halo behind the cartoon mechanic
       const circle = document.createElementNS(ns,'circle');
-      circle.setAttribute('r','7.5');
+      circle.setAttribute('r','16');
       circle.setAttribute('class','avatar-bg');
       g.appendChild(circle);
 
+      const icon = document.createElementNS(ns,'use');
+      icon.setAttribute('href','#mechanic-icon');
+      icon.setAttributeNS('http://www.w3.org/1999/xlink','href','#mechanic-icon');
+      icon.setAttribute('x','-11'); icon.setAttribute('y','-15');
+      icon.setAttribute('width','22'); icon.setAttribute('height','28');
+      g.appendChild(icon);
+
+      // Small initials badge, bottom-right of the marker, for at-a-glance ID
+      const badgeBg = document.createElementNS(ns,'circle');
+      badgeBg.setAttribute('class','badge-bg');
+      badgeBg.setAttribute('cx','11'); badgeBg.setAttribute('cy','11'); badgeBg.setAttribute('r','6.5');
+      g.appendChild(badgeBg);
+
       const text = document.createElementNS(ns,'text');
-      text.setAttribute('class','avatar-initial');
-      text.setAttribute('y','2.3');
+      text.setAttribute('class','badge-text');
+      text.setAttribute('x','11'); text.setAttribute('y','13.5');
       text.textContent = initials(t.name);
       g.appendChild(text);
 
@@ -434,6 +502,57 @@ function renderTable(){
   });
 }
 
+function renderProjects(){
+  const wrap = $('#projects-list');
+  wrap.innerHTML = '';
+  $('#projects-empty-note').hidden = technicians.length > 0;
+  if (technicians.length === 0) return;
+
+  // Group technicians by customer — each customer's job is treated as a
+  // "project", grouping people by what they're working on rather than by county.
+  const byCustomer = {};
+  technicians.forEach(t => {
+    const key = (t.customer || '').trim() || 'No customer set';
+    byCustomer[key] = byCustomer[key] || [];
+    byCustomer[key].push(t);
+  });
+
+  Object.keys(byCustomer).sort((a, b) => a.localeCompare(b)).forEach(customer => {
+    const list = byCustomer[customer];
+    const card = document.createElement('div');
+    card.className = 'project-card';
+
+    const counties = [...new Set(list.map(t => t.county).filter(Boolean))];
+    const machines = [...new Set(list.map(t => t.machine).filter(Boolean))];
+
+    card.innerHTML = `
+      <h3>${escapeHtml(customer)}</h3>
+      <div class="project-meta">
+        ${list.length} technician${list.length === 1 ? '' : 's'}
+        ${counties.length ? ' · ' + escapeHtml(counties.join(', ')) : ''}
+        ${machines.length ? ' · ' + escapeHtml(machines.join(', ')) : ''}
+      </div>
+    `;
+
+    list.forEach(t => {
+      const row = document.createElement('div');
+      row.className = 'tech-row';
+      row.innerHTML = `
+        <div class="avatar">${initials(t.name)}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="tech-name">${escapeHtml(t.name)}</div>
+          <div class="tech-meta">${escapeHtml(t.county || 'No county set')}${t.problem ? ' · ' + escapeHtml(t.problem) : ''}</div>
+        </div>
+        <span class="status-pill ${statusClass(t.status)}">${escapeHtml(t.status || 'On site')}</span>
+      `;
+      row.addEventListener('click', () => openEditModal(t));
+      card.appendChild(row);
+    });
+
+    wrap.appendChild(card);
+  });
+}
+
 function escapeHtml(str){
   return String(str ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
@@ -454,6 +573,7 @@ function renderAll(){
   renderMarkers();
   renderList();
   renderTable();
+  renderProjects();
 }
 
 async function loadTechnicians(silent){
@@ -471,9 +591,10 @@ async function loadTechnicians(silent){
 }
 
 function populateCountySelect(){
+  if (!COUNTY_GEO) return;
   const sel = $('#f-county');
   sel.innerHTML = '<option value="">— Select county —</option>' +
-    COUNTIES.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+    COUNTY_GEO.counties.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
 }
 
 async function loadConfig(){
@@ -583,13 +704,16 @@ function setView(view){
   currentView = view;
   $('#tab-map').classList.toggle('active', view==='map');
   $('#tab-list').classList.toggle('active', view==='list');
+  $('#tab-projects').classList.toggle('active', view==='projects');
   $('#map-view').hidden = view !== 'map';
   $('#list-view').hidden = view !== 'list';
+  $('#projects-view').hidden = view !== 'projects';
 }
 
 // wire up
 $('#tab-map').addEventListener('click', () => setView('map'));
 $('#tab-list').addEventListener('click', () => setView('list'));
+$('#tab-projects').addEventListener('click', () => setView('projects'));
 $('#add-btn').addEventListener('click', () => openAddModalForCounty(''));
 $('#refresh-btn').addEventListener('click', () => loadTechnicians());
 $('#cancel-btn').addEventListener('click', closeModal);
@@ -597,10 +721,19 @@ $('#save-btn').addEventListener('click', saveTechnician);
 $('#archive-btn').addEventListener('click', archiveTechnician);
 $('#modal-backdrop').addEventListener('click', (e) => { if (e.target.id === 'modal-backdrop') closeModal(); });
 
-populateCountySelect();
-buildMap();
-loadConfig().then(() => loadTechnicians());
-setInterval(() => loadTechnicians(true), 30000);
+loadCountyGeo()
+  .then(() => {
+    populateCountySelect();
+    buildMap();
+  })
+  .catch((err) => {
+    console.error(err);
+    $('#status-line').textContent = 'Could not load county map';
+  })
+  .finally(() => {
+    loadConfig().then(() => loadTechnicians());
+    setInterval(() => loadTechnicians(true), 30000);
+  });
 </script>
 
 </body>
