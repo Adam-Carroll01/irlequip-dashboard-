@@ -198,11 +198,32 @@
     .calendar-day{min-height:44px;font-size:10px;}
     .calendar-dow{font-size:9.5px;}
   }
+  .projects-toolbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+  .projects-toolbar h2{margin:0;font-size:18px;}
+  .projects-toolbar p{margin:4px 0 0;font-size:13px;color:var(--grey-500);max-width:520px;}
   #projects-list{display:flex;flex-direction:column;gap:14px;}
-  .project-card{background:var(--white);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;}
+  .project-card{background:var(--white);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;cursor:pointer;}
+  .project-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
   .project-card h3{margin:0 0 2px;font-size:15.5px;}
-  .project-card .project-meta{font-size:12.5px;color:var(--grey-500);margin-bottom:10px;}
-  .project-card .tech-row{padding:10px 6px;}
+  .project-card .project-meta{font-size:12.5px;color:var(--grey-500);}
+  .priority-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;flex:none;}
+  .priority-badge.priority-Low{background:#d4f0de;color:var(--ok);}
+  .priority-badge.priority-Medium{background:#fde3bf;color:#a15c00;}
+  .priority-badge.priority-High{background:#f3c6cd;color:var(--red);}
+  .deadline-pill{font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--grey-100);color:var(--grey-700);white-space:nowrap;}
+  .deadline-pill.overdue{background:#f3c6cd;color:var(--red);font-weight:700;}
+  .progress-row{display:flex;align-items:center;gap:10px;margin:12px 0 4px;}
+  .progress-track{flex:1;height:8px;border-radius:999px;background:var(--grey-100);overflow:hidden;}
+  .progress-fill{height:100%;border-radius:999px;transition:width .2s ease;background:var(--grey-700);}
+  .progress-fill.priority-Low{background:var(--ok);}
+  .progress-fill.priority-Medium{background:var(--warn);}
+  .progress-fill.priority-High{background:var(--red);}
+  .progress-label{font-size:12px;font-weight:700;color:var(--grey-700);width:34px;text-align:right;flex:none;}
+  .project-notes{font-size:13px;color:var(--grey-700);margin:10px 0 0;line-height:1.5;white-space:pre-wrap;}
+  .project-techs{border-top:1px solid var(--grey-100);padding-top:10px;margin-top:14px;cursor:default;}
+  .project-techs-label{font-size:11px;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;}
+  .project-techs-empty{font-size:12.5px;color:var(--grey-500);padding:8px 4px 2px;}
+  .project-card .tech-row{padding:10px 6px;cursor:pointer;}
   .project-card .tech-row + .tech-row{border-top:1px solid var(--grey-100);}
   .table-view table{width:100%;border-collapse:collapse;font-size:13.5px;}
   .table-view th{text-align:left;color:var(--grey-500);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:8px 10px;border-bottom:2px solid var(--grey-100);}
@@ -301,8 +322,16 @@
   </div>
 
   <div id="projects-view" hidden>
+    <div class="projects-toolbar">
+      <div>
+        <h2>Projects</h2>
+        <p>Jobs by customer — deadline, priority and progress. Kept separate from who's currently on site; technicians are linked in underneath.</p>
+      </div>
+      <button class="btn btn-primary" id="add-project-btn">+ Add project</button>
+    </div>
+    <p class="map-error" id="projects-error" hidden></p>
     <div id="projects-list"></div>
-    <p class="empty-note" id="projects-empty-note" hidden>No technicians logged yet. Click "+ Add technician" to get started.</p>
+    <p class="empty-note" id="projects-empty-note" hidden>No projects yet. Click "+ Add project" to get started.</p>
   </div>
 </main>
 
@@ -358,6 +387,56 @@
   </div>
 </div>
 
+<!-- Add / Edit project modal (separate record from technicians) -->
+<div class="modal-backdrop" id="project-modal-backdrop" hidden>
+  <div class="modal">
+    <h2 id="project-modal-title">Add project</h2>
+    <div class="subtitle" id="project-modal-subtitle">Track this job's deadline, priority and progress.</div>
+
+    <div class="field">
+      <label>Project name</label>
+      <input type="text" id="pf-name" placeholder="e.g. Pump overhaul" />
+    </div>
+    <div class="field">
+      <label>Customer</label>
+      <input type="text" id="pf-customer" placeholder="e.g. Glanbia — links technicians logged under the same customer" />
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Deadline</label>
+        <input type="date" id="pf-deadline" />
+      </div>
+      <div class="field">
+        <label>Priority</label>
+        <select id="pf-priority">
+          <option>Low</option>
+          <option selected>Medium</option>
+          <option>High</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Progress: <span id="pf-progress-label">0%</span></label>
+      <input type="range" id="pf-progress" min="0" max="100" step="5" value="0" />
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="pf-notes" placeholder="Job notes, blockers, next steps…"></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <div class="left">
+        <button class="btn btn-secondary" id="project-cancel-btn">Cancel</button>
+        <button class="btn btn-secondary" id="project-archive-btn" hidden>Remove</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <a class="trello-link" id="project-trello-link" href="#" target="_blank" hidden>Open in Trello ↗</a>
+        <button class="btn btn-primary" id="project-save-btn">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 // Real county shapes (32 counties, projected to the SVG viewBox below) —
 // loaded once from /counties-geo.json rather than hardcoded here.
@@ -382,8 +461,10 @@ function showMapError(detail){
 }
 
 let technicians = [];
+let projects = []; // separate Trello-list-backed project records — see renderProjectsList()
 let statuses = []; // [{id, name}] — loaded from /api/config, in board list order
 let editingId = null;
+let editingProjectId = null;
 let currentView = 'map';
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
@@ -404,24 +485,73 @@ function buildMap(){
   svg.innerHTML = '';
   const ns = 'http://www.w3.org/2000/svg';
 
-  // Reusable cartoon mechanic icon (orange overalls + hardhat), referenced
-  // by every technician marker via <use>. Defined once here.
+  // Reusable 3D-shaded cartoon mechanic icon (blue overalls, yellow hardhat,
+  // wrench in hand), referenced by every technician marker via <use>.
+  // Gradients + a drop-shadow filter give it volume/depth rather than flat
+  // fills. Defined once here.
   const defs = document.createElementNS(ns,'defs');
   defs.innerHTML = `
-    <symbol id="mechanic-icon" viewBox="0 0 20 26">
-      <ellipse cx="10" cy="24.5" rx="5.5" ry="1.2" fill="#000" opacity="0.12"/>
-      <rect x="5.5" y="22.5" width="3.4" height="3" rx="1" fill="#2b2b2e"/>
-      <rect x="11.1" y="22.5" width="3.4" height="3" rx="1" fill="#2b2b2e"/>
-      <rect x="4" y="14.5" width="12" height="9.5" rx="3.2" fill="#e8622a"/>
-      <rect x="1" y="15.5" width="3.2" height="6.5" rx="1.4" fill="#e8622a"/>
-      <rect x="15.8" y="15.5" width="3.2" height="6.5" rx="1.4" fill="#e8622a"/>
-      <circle cx="2.6" cy="21.6" r="1.3" fill="#f0b487"/>
-      <circle cx="17.4" cy="21.6" r="1.3" fill="#f0b487"/>
-      <line x1="10" y1="15.2" x2="10" y2="23.4" stroke="#c14e1f" stroke-width="0.8"/>
-      <rect x="6.4" y="17" width="2.6" height="2" rx="0.5" fill="#c14e1f"/>
-      <circle cx="10" cy="10.6" r="4.1" fill="#f0b487"/>
-      <path d="M4.6,7.6 A5.4,5.1 0 0 1 15.4,7.6 Z" fill="#f6b400"/>
-      <rect x="3.6" y="7.2" width="12.8" height="1.7" rx="0.85" fill="#d99a00"/>
+    <linearGradient id="grad-overalls" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6f9fe8"/>
+      <stop offset="100%" stop-color="#2f5aa8"/>
+    </linearGradient>
+    <linearGradient id="grad-overalls-dark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4a76c4"/>
+      <stop offset="100%" stop-color="#1f3f80"/>
+    </linearGradient>
+    <radialGradient id="grad-skin" cx="35%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#ffd9b8"/>
+      <stop offset="100%" stop-color="#e2a877"/>
+    </radialGradient>
+    <radialGradient id="grad-hardhat" cx="35%" cy="25%" r="85%">
+      <stop offset="0%" stop-color="#ffe066"/>
+      <stop offset="100%" stop-color="#d99a00"/>
+    </radialGradient>
+    <linearGradient id="grad-brim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8b400"/>
+      <stop offset="100%" stop-color="#b87d00"/>
+    </linearGradient>
+    <linearGradient id="grad-boot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#45454a"/>
+      <stop offset="100%" stop-color="#1c1c1e"/>
+    </linearGradient>
+    <linearGradient id="grad-belt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a97a49"/>
+      <stop offset="100%" stop-color="#6b4423"/>
+    </linearGradient>
+    <linearGradient id="grad-wrench" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f2f2f5"/>
+      <stop offset="100%" stop-color="#a4a4ad"/>
+    </linearGradient>
+    <radialGradient id="grad-sheen" cx="32%" cy="26%" r="78%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="marker-shadow" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="1.3" stdDeviation="1.3" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+    <symbol id="mechanic-icon" viewBox="0 0 22 28">
+      <ellipse cx="11" cy="26.3" rx="6" ry="1.3" fill="#000" opacity="0.16"/>
+      <rect x="6.0" y="23.9" width="3.6" height="3.3" rx="1" fill="url(#grad-boot)"/>
+      <rect x="12.4" y="23.9" width="3.6" height="3.3" rx="1" fill="url(#grad-boot)"/>
+      <rect x="1.0" y="16.5" width="3.4" height="7.2" rx="1.5" fill="url(#grad-overalls)"/>
+      <rect x="17.6" y="16.5" width="3.4" height="7.2" rx="1.5" fill="url(#grad-overalls)"/>
+      <circle cx="2.7" cy="23.4" r="1.4" fill="url(#grad-skin)"/>
+      <circle cx="19.3" cy="23.4" r="1.4" fill="url(#grad-skin)"/>
+      <g transform="translate(19.3,21.4) rotate(22)">
+        <rect x="-0.55" y="-3.4" width="1.1" height="4.8" rx="0.5" fill="url(#grad-wrench)"/>
+        <circle cx="0" cy="-3.6" r="1.2" fill="none" stroke="url(#grad-wrench)" stroke-width="0.95"/>
+      </g>
+      <rect x="4.3" y="15.4" width="13.4" height="10.3" rx="3.4" fill="url(#grad-overalls)"/>
+      <rect x="4.3" y="18.1" width="13.4" height="2.1" fill="url(#grad-belt)"/>
+      <rect x="9.4" y="18.5" width="3.2" height="2.7" rx="0.6" fill="#5a3a20"/>
+      <line x1="8.2" y1="15.7" x2="7.6" y2="11.8" stroke="url(#grad-overalls-dark)" stroke-width="1.3" stroke-linecap="round"/>
+      <line x1="13.8" y1="15.7" x2="14.4" y2="11.8" stroke="url(#grad-overalls-dark)" stroke-width="1.3" stroke-linecap="round"/>
+      <circle cx="11" cy="11" r="4.4" fill="url(#grad-skin)"/>
+      <path d="M5.1,8.1 A5.9,5.5 0 0 1 16.9,8.1 Z" fill="url(#grad-hardhat)"/>
+      <rect x="4.0" y="7.6" width="14.0" height="1.9" rx="0.95" fill="url(#grad-brim)"/>
+      <ellipse cx="8.7" cy="6.5" rx="1.7" ry="0.75" fill="#fff3b0" opacity="0.55"/>
     </symbol>
   `;
   svg.appendChild(defs);
@@ -493,6 +623,7 @@ function renderMarkers(){
       const g = document.createElementNS(ns,'g');
       g.setAttribute('class', 'tech-marker ' + statusClass(t.status));
       g.setAttribute('transform', `translate(${mx},${my})`);
+      g.setAttribute('filter', 'url(#marker-shadow)');
       g.addEventListener('click', (e) => { e.stopPropagation(); openEditModal(t); });
 
       const title = document.createElementNS(ns,'title');
@@ -501,9 +632,16 @@ function renderMarkers(){
 
       // Status-coloured halo behind the cartoon mechanic
       const circle = document.createElementNS(ns,'circle');
-      circle.setAttribute('r','16');
+      circle.setAttribute('r','16.5');
       circle.setAttribute('class','avatar-bg');
       g.appendChild(circle);
+
+      // Glossy highlight overlay on the halo for a bit of 3D "shine"
+      const sheen = document.createElementNS(ns,'circle');
+      sheen.setAttribute('r','16.5');
+      sheen.setAttribute('fill','url(#grad-sheen)');
+      sheen.style.pointerEvents = 'none';
+      g.appendChild(sheen);
 
       const icon = document.createElementNS(ns,'use');
       icon.setAttribute('href','#mechanic-icon');
@@ -572,55 +710,214 @@ function renderTable(){
   });
 }
 
-function renderProjects(){
+// Projects are their own records (name, customer, deadline, priority,
+// progress, notes) — NOT derived from whoever happens to be logged against
+// a customer right now. Technicians sharing the project's customer are
+// looked up and shown underneath each card as a secondary, linked section.
+function priorityRank(priority){
+  return { High: 0, Medium: 1, Low: 2 }[priority] ?? 1;
+}
+
+function daysUntil(dateStr){
+  const d = parseDateOnly(dateStr);
+  if (!d) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.round((d - today) / 86400000);
+}
+
+function deadlineLabel(p){
+  if (!p.deadline) return '';
+  const formatted = formatDate(p.deadline);
+  const days = daysUntil(p.deadline);
+  if (days === null) return formatted;
+  if (days < 0) return `${formatted} · ${Math.abs(days)}d overdue`;
+  if (days === 0) return `${formatted} · due today`;
+  return `${formatted} · ${days}d left`;
+}
+
+function techniciansForProject(p){
+  const key = (p.customer || '').trim().toLowerCase();
+  if (!key) return [];
+  return technicians.filter(t => (t.customer || '').trim().toLowerCase() === key);
+}
+
+function renderProjectsList(){
   const wrap = $('#projects-list');
   wrap.innerHTML = '';
-  $('#projects-empty-note').hidden = technicians.length > 0;
-  if (technicians.length === 0) return;
+  $('#projects-empty-note').hidden = projects.length > 0;
+  if (projects.length === 0) return;
 
-  // Group technicians by customer — each customer's job is treated as a
-  // "project", grouping people by what they're working on rather than by county.
-  const byCustomer = {};
-  technicians.forEach(t => {
-    const key = (t.customer || '').trim() || 'No customer set';
-    byCustomer[key] = byCustomer[key] || [];
-    byCustomer[key].push(t);
+  const sorted = [...projects].sort((a, b) => {
+    const rankDiff = priorityRank(a.priority) - priorityRank(b.priority);
+    if (rankDiff !== 0) return rankDiff;
+    return (a.name || '').localeCompare(b.name || '');
   });
 
-  Object.keys(byCustomer).sort((a, b) => a.localeCompare(b)).forEach(customer => {
-    const list = byCustomer[customer];
+  sorted.forEach(p => {
+    const assigned = techniciansForProject(p);
+    const overdue = p.progress < 100 && daysUntil(p.deadline) !== null && daysUntil(p.deadline) < 0;
+
     const card = document.createElement('div');
     card.className = 'project-card';
-
-    const counties = [...new Set(list.map(t => t.county).filter(Boolean))];
-    const machines = [...new Set(list.map(t => t.machine).filter(Boolean))];
-
     card.innerHTML = `
-      <h3>${escapeHtml(customer)}</h3>
-      <div class="project-meta">
-        ${list.length} technician${list.length === 1 ? '' : 's'}
-        ${counties.length ? ' · ' + escapeHtml(counties.join(', ')) : ''}
-        ${machines.length ? ' · ' + escapeHtml(machines.join(', ')) : ''}
+      <div class="project-card-top">
+        <div>
+          <h3>${escapeHtml(p.name)}</h3>
+          <div class="project-meta">
+            ${p.customer ? escapeHtml(p.customer) : 'No customer set'}
+            ${p.deadline ? ` · <span class="deadline-pill${overdue ? ' overdue' : ''}">${escapeHtml(deadlineLabel(p))}</span>` : ''}
+          </div>
+        </div>
+        <span class="priority-badge priority-${p.priority}">${escapeHtml(p.priority)}</span>
+      </div>
+      <div class="progress-row">
+        <div class="progress-track"><div class="progress-fill priority-${p.priority}" style="width:${p.progress}%"></div></div>
+        <span class="progress-label">${p.progress}%</span>
+      </div>
+      ${p.notes ? `<p class="project-notes">${escapeHtml(p.notes)}</p>` : ''}
+      <div class="project-techs">
+        <div class="project-techs-label">Technicians on this job</div>
       </div>
     `;
 
-    list.forEach(t => {
-      const row = document.createElement('div');
-      row.className = 'tech-row';
-      row.innerHTML = `
-        <div class="avatar">${initials(t.name)}</div>
-        <div style="flex:1;min-width:0;">
-          <div class="tech-name">${escapeHtml(t.name)}</div>
-          <div class="tech-meta">${escapeHtml(t.county || 'No county set')}${t.problem ? ' · ' + escapeHtml(t.problem) : ''}</div>
-        </div>
-        <span class="status-pill ${statusClass(t.status)}">${escapeHtml(t.status || 'On site')}</span>
-      `;
-      row.addEventListener('click', () => openEditModal(t));
-      card.appendChild(row);
-    });
+    const techsWrap = card.querySelector('.project-techs');
+    if (assigned.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'project-techs-empty';
+      empty.textContent = p.customer
+        ? 'No technicians currently logged under this customer.'
+        : 'Set a customer to link technicians logged under it.';
+      techsWrap.appendChild(empty);
+    } else {
+      assigned.forEach(t => {
+        const row = document.createElement('div');
+        row.className = 'tech-row';
+        row.innerHTML = `
+          <div class="avatar">${initials(t.name)}</div>
+          <div style="flex:1;min-width:0;">
+            <div class="tech-name">${escapeHtml(t.name)}</div>
+            <div class="tech-meta">${escapeHtml(t.county || 'No county set')}${t.problem ? ' · ' + escapeHtml(t.problem) : ''}</div>
+          </div>
+          <span class="status-pill ${statusClass(t.status)}">${escapeHtml(t.status || 'On site')}</span>
+        `;
+        row.addEventListener('click', (e) => { e.stopPropagation(); openEditModal(t); });
+        techsWrap.appendChild(row);
+      });
+    }
 
+    card.addEventListener('click', () => openEditProjectModal(p));
     wrap.appendChild(card);
   });
+}
+
+async function loadProjects(){
+  try {
+    const r = await fetch('/api/projects');
+    if (!r.ok) {
+      let message = 'Could not load projects.';
+      try { const body = await r.json(); message = body.detail || body.error || message; } catch (e) {}
+      throw new Error(message);
+    }
+    projects = await r.json();
+    $('#projects-error').hidden = true;
+  } catch (err) {
+    console.error(err);
+    projects = [];
+    $('#projects-error').textContent = err.message;
+    $('#projects-error').hidden = false;
+  }
+  renderProjectsList();
+}
+
+function openAddProjectModal(){
+  editingProjectId = null;
+  $('#project-modal-title').textContent = 'Add project';
+  $('#project-modal-subtitle').textContent = "Track this job's deadline, priority and progress.";
+  $('#pf-name').value = '';
+  $('#pf-customer').value = '';
+  $('#pf-deadline').value = '';
+  $('#pf-priority').value = 'Medium';
+  $('#pf-progress').value = '0';
+  $('#pf-progress-label').textContent = '0%';
+  $('#pf-notes').value = '';
+  $('#project-archive-btn').hidden = true;
+  $('#project-trello-link').hidden = true;
+  $('#project-modal-backdrop').hidden = false;
+  $('#pf-name').focus();
+}
+
+function openEditProjectModal(p){
+  editingProjectId = p.id;
+  $('#project-modal-title').textContent = p.name;
+  $('#project-modal-subtitle').textContent = 'Update deadline, priority and progress.';
+  $('#pf-name').value = p.name;
+  $('#pf-customer').value = p.customer || '';
+  $('#pf-deadline').value = p.deadline || '';
+  $('#pf-priority').value = p.priority || 'Medium';
+  $('#pf-progress').value = p.progress || 0;
+  $('#pf-progress-label').textContent = `${p.progress || 0}%`;
+  $('#pf-notes').value = p.notes || '';
+  $('#project-archive-btn').hidden = false;
+  if (p.trelloUrl) {
+    $('#project-trello-link').hidden = false;
+    $('#project-trello-link').href = p.trelloUrl;
+  } else {
+    $('#project-trello-link').hidden = true;
+  }
+  $('#project-modal-backdrop').hidden = false;
+}
+
+function closeProjectModal(){
+  $('#project-modal-backdrop').hidden = true;
+}
+
+async function saveProject(){
+  const name = $('#pf-name').value.trim();
+  if (!name) { $('#pf-name').focus(); return; }
+
+  const payload = {
+    name,
+    customer: $('#pf-customer').value.trim(),
+    deadline: $('#pf-deadline').value,
+    priority: $('#pf-priority').value,
+    progress: Number($('#pf-progress').value) || 0,
+    notes: $('#pf-notes').value.trim(),
+  };
+
+  $('#project-save-btn').disabled = true;
+  try {
+    const url = editingProjectId ? `/api/projects/${editingProjectId}` : '/api/projects';
+    const method = editingProjectId ? 'PUT' : 'POST';
+    const r = await fetch(url, {
+      method,
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      let message = 'Could not save project.';
+      try { const body = await r.json(); message = body.detail || body.error || message; } catch (e) {}
+      throw new Error(message);
+    }
+    closeProjectModal();
+    await loadProjects();
+  } catch (err) {
+    alert('Could not save — ' + err.message);
+  } finally {
+    $('#project-save-btn').disabled = false;
+  }
+}
+
+async function archiveProject(){
+  if (!editingProjectId) return;
+  if (!confirm('Remove this project? (The Trello card is archived, not deleted, so history is kept.)')) return;
+  try {
+    const r = await fetch(`/api/projects/${editingProjectId}`, { method:'DELETE' });
+    if (!r.ok) throw new Error(await r.text());
+    closeProjectModal();
+    await loadProjects();
+  } catch (err) {
+    alert('Could not remove — ' + err.message);
+  }
 }
 
 function escapeHtml(str){
@@ -741,7 +1038,7 @@ function renderAll(){
   renderMarkers();
   renderList();
   renderTable();
-  renderProjects();
+  renderProjectsList();
   renderCalendar();
 }
 
@@ -897,6 +1194,12 @@ $('#cancel-btn').addEventListener('click', closeModal);
 $('#save-btn').addEventListener('click', saveTechnician);
 $('#archive-btn').addEventListener('click', archiveTechnician);
 $('#modal-backdrop').addEventListener('click', (e) => { if (e.target.id === 'modal-backdrop') closeModal(); });
+$('#add-project-btn').addEventListener('click', openAddProjectModal);
+$('#project-cancel-btn').addEventListener('click', closeProjectModal);
+$('#project-save-btn').addEventListener('click', saveProject);
+$('#project-archive-btn').addEventListener('click', archiveProject);
+$('#project-modal-backdrop').addEventListener('click', (e) => { if (e.target.id === 'project-modal-backdrop') closeProjectModal(); });
+$('#pf-progress').addEventListener('input', () => { $('#pf-progress-label').textContent = `${$('#pf-progress').value}%`; });
 $('#cal-prev').addEventListener('click', () => {
   calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
   renderCalendar();
@@ -924,7 +1227,8 @@ loadCountyGeo()
   })
   .finally(() => {
     loadConfig().then(() => loadTechnicians());
-    setInterval(() => loadTechnicians(true), 30000);
+    loadProjects();
+    setInterval(() => { loadTechnicians(true); loadProjects(); }, 30000);
   });
 </script>
 
