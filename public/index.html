@@ -223,6 +223,8 @@
   .modal h2{margin:0 0 4px;font-size:18px;}
   .modal .subtitle{color:var(--grey-500);font-size:13px;margin-bottom:16px;}
   .field{margin-bottom:14px;}
+  .field-row{display:flex;gap:10px;}
+  .field-row .field{flex:1;}
   .field label{display:block;font-size:12.5px;font-weight:600;color:var(--grey-700);margin-bottom:5px;}
   .field input, .field select, .field textarea{
     width:100%;padding:9px 11px;border:1.5px solid var(--grey-100);border-radius:8px;
@@ -285,14 +287,14 @@
         </div>
       </div>
       <div class="calendar-grid" id="calendar-grid"></div>
-      <p class="hint">Shows each technician on the day they were last updated.</p>
+      <p class="hint">Shows each technician on their scheduled date (falls back to when they were last updated if no date is set).</p>
     </div>
   </div>
 
   <div id="list-view" class="card-panel table-view" hidden>
     <table>
       <thead>
-        <tr><th>Technician</th><th>County</th><th>Customer</th><th>Machine</th><th>Status</th><th>Updated</th></tr>
+        <tr><th>Technician</th><th>County</th><th>Customer</th><th>Machine</th><th>Status</th><th>Date</th></tr>
       </thead>
       <tbody id="table-body"></tbody>
     </table>
@@ -318,9 +320,15 @@
       <label>County</label>
       <select id="f-county"></select>
     </div>
-    <div class="field">
-      <label>Status</label>
-      <select id="f-status"></select>
+    <div class="field-row">
+      <div class="field">
+        <label>Status</label>
+        <select id="f-status"></select>
+      </div>
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="f-date" />
+      </div>
     </div>
     <div class="field">
       <label>Customer</label>
@@ -557,7 +565,7 @@ function renderTable(){
       <td>${escapeHtml(t.customer || '—')}</td>
       <td>${escapeHtml(t.machine || '—')}</td>
       <td><span class="status-pill ${statusClass(t.status)}">${escapeHtml(t.status || 'On site')}</span></td>
-      <td>${formatTime(t.updated)}</td>
+      <td>${formatDate(t.date) || formatTime(t.updated)}</td>
     `;
     tr.addEventListener('click', () => openEditModal(t));
     body.appendChild(tr);
@@ -631,10 +639,31 @@ function formatTime(iso){
   return d.toLocaleDateString('en-IE', { day:'2-digit', month:'short' });
 }
 
+// t.date is a plain "YYYY-MM-DD" string (from an <input type="date">) — parse
+// it as a local date, not UTC, so it doesn't shift a day depending on timezone.
+function parseDateOnly(str){
+  if (!str) return null;
+  const [y, m, d] = str.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
+function formatDate(str){
+  const d = parseDateOnly(str);
+  if (!d) return '';
+  return d.toLocaleDateString('en-IE', { day:'2-digit', month:'short', year:'numeric' });
+}
+
 const DOW_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
 function dateKey(d){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// The day a technician belongs on in the calendar: their explicit job Date
+// if they have one, otherwise the day their card was last updated.
+function calendarDateFor(t){
+  return parseDateOnly(t.date) || (t.updated && !isNaN(new Date(t.updated)) ? new Date(t.updated) : null);
 }
 
 function renderCalendar(){
@@ -649,12 +678,10 @@ function renderCalendar(){
     grid.appendChild(el);
   });
 
-  // Group technicians by the calendar day their card was last updated.
   const byDay = {};
   technicians.forEach(t => {
-    if (!t.updated) return;
-    const d = new Date(t.updated);
-    if (isNaN(d)) return;
+    const d = calendarDateFor(t);
+    if (!d) return;
     const key = dateKey(d);
     byDay[key] = byDay[key] || [];
     byDay[key].push(t);
@@ -755,6 +782,11 @@ function defaultStatus(){
   return statuses[0]?.name || '';
 }
 
+function todayDateInputValue(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 function openAddModalForCounty(countyName){
   editingId = null;
   $('#modal-title').textContent = 'Add technician';
@@ -762,6 +794,7 @@ function openAddModalForCounty(countyName){
   $('#f-name').value = '';
   $('#f-county').value = countyName || '';
   $('#f-status').value = defaultStatus();
+  $('#f-date').value = todayDateInputValue();
   $('#f-customer').value = '';
   $('#f-machine').value = '';
   $('#f-problem').value = '';
@@ -779,6 +812,7 @@ function openEditModal(t){
   $('#f-name').value = t.name;
   $('#f-county').value = t.county || '';
   $('#f-status').value = t.status || defaultStatus();
+  $('#f-date').value = t.date || '';
   $('#f-customer').value = t.customer || '';
   $('#f-machine').value = t.machine || '';
   $('#f-problem').value = t.problem || '';
@@ -805,6 +839,7 @@ async function saveTechnician(){
     name,
     county: $('#f-county').value,
     status: $('#f-status').value,
+    date: $('#f-date').value,
     customer: $('#f-customer').value.trim(),
     machine: $('#f-machine').value.trim(),
     problem: $('#f-problem').value.trim(),
