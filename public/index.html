@@ -91,6 +91,7 @@
   }
   .view-toggle button.active{background:var(--white);color:var(--black);box-shadow:var(--shadow);}
   #status-line{font-size:13px;color:var(--grey-500);}
+  #map-view{display:flex;flex-direction:column;gap:20px;}
   .layout{
     display:grid;
     grid-template-columns:minmax(280px, 460px) 1fr;
@@ -107,6 +108,11 @@
     padding:16px;
   }
   #map-wrap{position:relative;}
+  .map-error{
+    background:#fdecec;color:#9c2b2b;border:1px solid #f3c6c6;border-radius:10px;
+    padding:12px 14px;font-size:13px;line-height:1.5;margin:0 0 14px;
+  }
+  .map-error code{background:rgba(0,0,0,0.06);padding:1px 5px;border-radius:4px;font-size:12px;}
   #ireland-map{width:100%;height:auto;display:block;}
   #ireland-map .water{fill:var(--grey-100);}
   .county{
@@ -165,6 +171,33 @@
   .status-pill.status-Completed{background:#d4f0de;color:var(--ok);}
   .tech-meta{font-size:12.5px;color:var(--grey-500);margin-top:2px;}
   .tech-name{font-weight:600;font-size:14.5px;}
+  .calendar-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+  .calendar-nav{display:flex;gap:6px;}
+  .calendar-nav .btn{padding:6px 12px;font-size:13px;}
+  .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .calendar-dow{font-size:11px;font-weight:700;color:var(--grey-500);text-transform:uppercase;letter-spacing:.04em;text-align:center;padding-bottom:4px;}
+  .calendar-day{
+    min-height:64px;border-radius:8px;background:var(--grey-50);
+    padding:5px 5px 6px;display:flex;flex-direction:column;gap:3px;
+  }
+  .calendar-day.other-month{background:transparent;}
+  .calendar-day.other-month .day-num{color:var(--grey-300);}
+  .calendar-day.today{background:#fdecec;}
+  .calendar-day .day-num{font-size:11.5px;font-weight:600;color:var(--grey-700);}
+  .calendar-day.today .day-num{color:var(--red);}
+  .calendar-chip{
+    display:flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;
+    padding:2px 6px;border-radius:999px;cursor:pointer;color:var(--white);
+    background:var(--red);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .calendar-chip.status-Scheduled{background:#4a6fa5;}
+  .calendar-chip.status-Waiting-on-parts{background:#7a5cc4;}
+  .calendar-chip.status-Completed{background:var(--ok);}
+  .calendar-more{font-size:10px;color:var(--grey-500);padding-left:6px;}
+  @media (max-width:600px){
+    .calendar-day{min-height:44px;font-size:10px;}
+    .calendar-dow{font-size:9.5px;}
+  }
   #projects-list{display:flex;flex-direction:column;gap:14px;}
   .project-card{background:var(--white);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;}
   .project-card h3{margin:0 0 2px;font-size:15.5px;}
@@ -223,20 +256,36 @@
     </div>
   </div>
 
-  <div id="map-view" class="layout">
-    <div class="card-panel" id="map-wrap">
-      <svg id="ireland-map" viewBox="0 0 760 981.3"></svg>
-      <div class="map-legend">
-        <span class="item"><span class="swatch leinster"></span>Leinster</span>
-        <span class="item"><span class="swatch munster"></span>Munster</span>
-        <span class="item"><span class="swatch connacht"></span>Connacht</span>
-        <span class="item"><span class="swatch ulster"></span>Ulster</span>
+  <div id="map-view">
+    <div class="layout">
+      <div class="card-panel" id="map-wrap">
+        <p class="map-error" id="map-error" hidden></p>
+        <svg id="ireland-map" viewBox="0 0 760 981.3"></svg>
+        <div class="map-legend">
+          <span class="item"><span class="swatch leinster"></span>Leinster</span>
+          <span class="item"><span class="swatch munster"></span>Munster</span>
+          <span class="item"><span class="swatch connacht"></span>Connacht</span>
+          <span class="item"><span class="swatch ulster"></span>Ulster</span>
+        </div>
+      </div>
+      <div class="card-panel">
+        <h3 style="margin-top:0;">On the road</h3>
+        <ul class="tech-list" id="tech-list"></ul>
+        <p class="empty-note" id="empty-note" hidden>No technicians logged yet. Click "+ Add technician" to get started.</p>
       </div>
     </div>
-    <div class="card-panel">
-      <h3 style="margin-top:0;">On the road</h3>
-      <ul class="tech-list" id="tech-list"></ul>
-      <p class="empty-note" id="empty-note" hidden>No technicians logged yet. Click "+ Add technician" to get started.</p>
+
+    <div class="card-panel" id="calendar-card">
+      <div class="calendar-header">
+        <h3 id="calendar-title" style="margin:0;"></h3>
+        <div class="calendar-nav">
+          <button class="btn btn-secondary" id="cal-prev">‹</button>
+          <button class="btn btn-secondary" id="cal-today">Today</button>
+          <button class="btn btn-secondary" id="cal-next">›</button>
+        </div>
+      </div>
+      <div class="calendar-grid" id="calendar-grid"></div>
+      <p class="hint">Shows each technician on the day they were last updated.</p>
     </div>
   </div>
 
@@ -308,14 +357,27 @@ let COUNTY_GEO = null; // { width, height, counties: [{name,d,lx,ly,province,app
 
 async function loadCountyGeo(){
   const r = await fetch('/counties-geo.json');
-  if (!r.ok) throw new Error('Could not load county map data');
-  COUNTY_GEO = await r.json();
+  if (!r.ok) throw new Error(`counties-geo.json responded ${r.status}`);
+  const data = await r.json();
+  if (!data || !Array.isArray(data.counties) || data.counties.length === 0) {
+    throw new Error('counties-geo.json loaded but had no county data in it');
+  }
+  COUNTY_GEO = data;
+}
+
+function showMapError(detail){
+  const el = $('#map-error');
+  el.innerHTML = `Couldn't load the county map (${escapeHtml(detail)}). Make sure ` +
+    `<code>public/counties-geo.json</code> was deployed alongside <code>index.html</code> — ` +
+    `open <code>/counties-geo.json</code> directly in the browser to check it returns JSON, not a 404 page.`;
+  el.hidden = false;
 }
 
 let technicians = [];
 let statuses = []; // [{id, name}] — loaded from /api/config, in board list order
 let editingId = null;
 let currentView = 'map';
+let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -569,11 +631,91 @@ function formatTime(iso){
   return d.toLocaleDateString('en-IE', { day:'2-digit', month:'short' });
 }
 
+const DOW_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+function dateKey(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function renderCalendar(){
+  const grid = $('#calendar-grid');
+  grid.innerHTML = '';
+  $('#calendar-title').textContent = calendarMonth.toLocaleDateString('en-IE', { month:'long', year:'numeric' });
+
+  DOW_LABELS.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'calendar-dow';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  // Group technicians by the calendar day their card was last updated.
+  const byDay = {};
+  technicians.forEach(t => {
+    if (!t.updated) return;
+    const d = new Date(t.updated);
+    if (isNaN(d)) return;
+    const key = dateKey(d);
+    byDay[key] = byDay[key] || [];
+    byDay[key].push(t);
+  });
+
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  // Monday-first grid: JS getDay() is 0=Sun..6=Sat, shift so Mon=0..Sun=6.
+  const leadingBlanks = (firstOfMonth.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+  const today = new Date();
+  const todayKey = dateKey(today);
+
+  const cells = [];
+  for (let i = 0; i < leadingBlanks; i++) {
+    cells.push({ day: daysInPrevMonth - leadingBlanks + 1 + i, otherMonth: true, key: null });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ day: d, otherMonth: false, key: dateKey(new Date(year, month, d)) });
+  }
+  while (cells.length % 7 !== 0) {
+    cells.push({ day: cells.length - (leadingBlanks + daysInMonth) + 1, otherMonth: true, key: null });
+  }
+
+  cells.forEach(cell => {
+    const cellEl = document.createElement('div');
+    cellEl.className = 'calendar-day' + (cell.otherMonth ? ' other-month' : '') + (cell.key === todayKey ? ' today' : '');
+
+    const num = document.createElement('div');
+    num.className = 'day-num';
+    num.textContent = cell.day;
+    cellEl.appendChild(num);
+
+    const list = (cell.key && byDay[cell.key]) || [];
+    list.slice(0, 3).forEach(t => {
+      const chip = document.createElement('div');
+      chip.className = 'calendar-chip ' + statusClass(t.status);
+      chip.textContent = t.name;
+      chip.title = `${t.name} · ${t.status || 'On site'}`;
+      chip.addEventListener('click', () => openEditModal(t));
+      cellEl.appendChild(chip);
+    });
+    if (list.length > 3) {
+      const more = document.createElement('div');
+      more.className = 'calendar-more';
+      more.textContent = `+${list.length - 3} more`;
+      cellEl.appendChild(more);
+    }
+
+    grid.appendChild(cellEl);
+  });
+}
+
 function renderAll(){
   renderMarkers();
   renderList();
   renderTable();
   renderProjects();
+  renderCalendar();
 }
 
 async function loadTechnicians(silent){
@@ -720,6 +862,20 @@ $('#cancel-btn').addEventListener('click', closeModal);
 $('#save-btn').addEventListener('click', saveTechnician);
 $('#archive-btn').addEventListener('click', archiveTechnician);
 $('#modal-backdrop').addEventListener('click', (e) => { if (e.target.id === 'modal-backdrop') closeModal(); });
+$('#cal-prev').addEventListener('click', () => {
+  calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
+  renderCalendar();
+});
+$('#cal-next').addEventListener('click', () => {
+  calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
+  renderCalendar();
+});
+$('#cal-today').addEventListener('click', () => {
+  calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  renderCalendar();
+});
+
+renderCalendar();
 
 loadCountyGeo()
   .then(() => {
@@ -729,6 +885,7 @@ loadCountyGeo()
   .catch((err) => {
     console.error(err);
     $('#status-line').textContent = 'Could not load county map';
+    showMapError(err.message);
   })
   .finally(() => {
     loadConfig().then(() => loadTechnicians());
