@@ -425,6 +425,7 @@
           <span class="item"><span class="swatch connacht"></span>Connacht</span>
           <span class="item"><span class="swatch ulster"></span>Ulster</span>
         </div>
+        <p class="hint" style="margin-bottom:0;">Showing technicians scheduled for today only. See List or Calendar for every date.</p>
       </div>
       <div class="card-panel">
         <h3 style="margin-top:0;">On the road</h3>
@@ -818,8 +819,13 @@ function renderMarkers(){
   svg.querySelectorAll('.tech-marker').forEach(el => el.remove());
   svg.querySelectorAll('.county').forEach(el => el.classList.remove('has-tech'));
 
+  // The map is a "right now" view — only plot technicians scheduled for
+  // today (t.date). Anyone with a past/future date, or no date at all, still
+  // shows up in the List, Projects and Calendar views, just not as a pin.
+  const todaysTechnicians = technicians.filter(t => daysUntil(t.date) === 0);
+
   const byCounty = {};
-  technicians.forEach(t => {
+  todaysTechnicians.forEach(t => {
     const key = t.county || 'Unassigned';
     byCounty[key] = byCounty[key] || [];
     byCounty[key].push(t);
